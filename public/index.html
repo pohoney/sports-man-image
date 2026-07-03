@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sports-man studio</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="homeView">
+      <aside class="style-rail">
+        <button id="homeTitle" class="brand-block brand-button" type="button">
+          <div class="brand-mark">SM</div>
+          <div>
+            <p class="kicker">sports-man</p>
+            <h1>运动人物素材生成器</h1>
+          </div>
+        </button>
+
+        <section>
+          <div class="section-heading">
+            <span>Style</span>
+          </div>
+          <div id="styleList" class="style-list"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div class="title-row">
+            <div>
+              <p class="kicker">Prompt Console</p>
+              <h2>选择维度，实时生成 prompt</h2>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button id="refreshGallery" class="icon-button" type="button" title="刷新图库" aria-label="刷新图库">↻</button>
+            <button id="openGallery" class="ghost-button" type="button">生成结果</button>
+            <button id="openApiSettings" class="ghost-button" type="button">API</button>
+          </div>
+        </header>
+
+        <nav id="tabs" class="tabs" aria-label="Dimension tabs"></nav>
+
+        <section class="dimension-card">
+          <div class="dimension-title">
+            <div>
+              <p id="tabKicker" class="kicker">Dimension</p>
+              <h3 id="tabTitle">Sport</h3>
+            </div>
+            <p id="tabHint"></p>
+          </div>
+          <div id="dimensionOptions" class="option-grid"></div>
+        </section>
+
+        <section class="prompt-card prompt-dock">
+          <div class="prompt-head">
+            <div>
+              <p class="kicker">Live Prompt</p>
+              <h2>预览与复制</h2>
+            </div>
+            <button id="copyPrompt" class="ghost-button" type="button">复制</button>
+          </div>
+          <textarea id="promptPreview" spellcheck="false"></textarea>
+          <div class="prompt-actions">
+            <button id="generateButton" class="primary-button" type="button">开始生图</button>
+            <p id="statusText">输出目录：output/images</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <section class="gallery-view" id="galleryView" hidden>
+      <header class="gallery-topbar">
+        <button id="backHome" class="gallery-title" type="button">
+          <span class="brand-mark compact">SM</span>
+          <span>sports-man gallery</span>
+        </button>
+        <div class="top-actions">
+          <button id="galleryRefresh" class="icon-button" type="button" title="刷新图库" aria-label="刷新图库">↻</button>
+          <select id="galleryFilter" class="gallery-filter" aria-label="按风格筛选图库">
+            <option value="all">全部风格</option>
+          </select>
+        </div>
+      </header>
+      <div id="gallery" class="gallery-waterfall"></div>
+    </section>
+
+    <dialog id="apiDialog" class="api-dialog">
+      <form method="dialog" class="api-dialog-inner">
+        <div class="prompt-head">
+          <div>
+            <p class="kicker">Image API</p>
+            <h2>生图接口设置</h2>
+          </div>
+          <button class="ghost-button" value="close" type="submit">关闭</button>
+        </div>
+        <label class="field-label" for="providerSelect">生成方式</label>
+        <select id="providerSelect">
+          <option value="codex">Codex CLI + $imagegen</option>
+          <option value="custom">我的生图 API</option>
+        </select>
+        <label class="field-label" for="apiEndpoint">API Endpoint</label>
+        <input id="apiEndpoint" type="url" placeholder="https://api.example.com/v1/images/generations" />
+        <label class="field-label" for="apiKey">API Key</label>
+        <input id="apiKey" type="password" placeholder="留空则保留已保存 key" />
+        <div class="field-row">
+          <label>
+            <span>Model</span>
+            <input id="apiModel" type="text" placeholder="gpt-image-1" />
+          </label>
+          <label>
+            <span>Size</span>
+            <input id="apiSize" type="text" placeholder="1024x1536" />
+          </label>
+        </div>
+        <button id="saveSettings" class="primary-button full-width" type="button">保存 API 设置</button>
+        <p id="settingsStatus" class="mini-status">未加载设置</p>
+      </form>
+    </dialog>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
