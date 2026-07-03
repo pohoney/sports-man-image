@@ -3,7 +3,7 @@ const styles = [
     id: "realistic",
     label: "A 写实摄影风",
     description: "商业体育海报感，强方向光，高对比。",
-    cover: "/assets/style-realistic.png",
+    cover: new URL("./assets/style-realistic.png", import.meta.url).pathname,
     prompt:
       "realistic sports photography, commercial athletic poster, crisp details, high contrast lighting, vivid color grading"
   },
@@ -11,7 +11,7 @@ const styles = [
     id: "vintage",
     label: "B 复古艺术纪实摄影",
     description: "胶片色彩，运动拖影，街头运动纪实。",
-    cover: "/assets/style-vintage.png",
+    cover: new URL("./assets/style-vintage.png", import.meta.url).pathname,
     prompt:
       "vintage documentary sports photography, film grain, cinematic film color, muted colors, candid athletic moment, motion trail behind limbs or equipment"
   }
@@ -382,13 +382,18 @@ function currentSummary() {
 }
 
 async function loadSettings() {
-  const response = await fetch("/api/settings");
-  state.settings = await response.json();
-  $("#providerSelect").value = state.settings.provider || "codex";
-  $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
-  $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
-  $("#apiSize").value = state.settings.custom?.size || "1024x1536";
-  $("#settingsStatus").textContent = state.settings.custom?.apiKeySet ? "已保存 API Key。" : "尚未保存 API Key。";
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) throw new Error("settings api unavailable");
+    state.settings = await response.json();
+    $("#providerSelect").value = state.settings.provider || "codex";
+    $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
+    $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
+    $("#apiSize").value = state.settings.custom?.size || "1024x1536";
+    $("#settingsStatus").textContent = state.settings.custom?.apiKeySet ? "已保存 API Key。" : "尚未保存 API Key。";
+  } catch {
+    $("#settingsStatus").textContent = "静态托管模式：API 设置需要部署后端服务。";
+  }
 }
 
 async function saveSettings() {
@@ -401,14 +406,19 @@ async function saveSettings() {
       size: $("#apiSize").value.trim() || "1024x1536"
     }
   };
-  const response = await fetch("/api/settings", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  state.settings = await response.json();
-  $("#apiKey").value = "";
-  $("#settingsStatus").textContent = `已保存：${state.settings.provider === "custom" ? "我的生图 API" : "Codex CLI"}`;
+  try {
+    const response = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error("settings api unavailable");
+    state.settings = await response.json();
+    $("#apiKey").value = "";
+    $("#settingsStatus").textContent = `已保存：${state.settings.provider === "custom" ? "我的生图 API" : "Codex CLI"}`;
+  } catch {
+    $("#settingsStatus").textContent = "当前是静态托管页面，不能保存 API 设置。请部署 Node 服务或 EdgeOne Functions。";
+  }
 }
 
 function renderStyles() {
@@ -548,11 +558,18 @@ async function copyPrompt() {
 }
 
 async function loadGallery() {
-  const response = await fetch("/api/images");
-  const data = await response.json();
-  state.galleryImages = data.images || [];
-  renderGalleryFilters();
-  renderGallery();
+  try {
+    const response = await fetch("/api/images");
+    if (!response.ok) throw new Error("gallery api unavailable");
+    const data = await response.json();
+    state.galleryImages = data.images || [];
+    renderGalleryFilters();
+    renderGallery();
+  } catch {
+    state.galleryImages = [];
+    renderGalleryFilters();
+    $("#gallery").innerHTML = `<div class="empty">静态托管模式下无法读取生成图库。首页的维度选择和 prompt 复制仍可使用。</div>`;
+  }
 }
 
 function renderGalleryFilters() {

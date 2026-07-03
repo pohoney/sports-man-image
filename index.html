@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>sports-man studio</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./public/styles.css" />
   </head>
   <body>
     <div class="app-shell" id="homeView">
@@ -64,7 +64,7 @@
           <textarea id="promptPreview" spellcheck="false"></textarea>
           <div class="prompt-actions">
             <button id="generateButton" class="primary-button" type="button">开始生图</button>
-            <p id="statusText">输出目录：output/images</p>
+            <p id="statusText">静态预览模式：可选择维度与复制 prompt</p>
           </div>
         </section>
       </main>
@@ -115,10 +115,10 @@
           </label>
         </div>
         <button id="saveSettings" class="primary-button full-width" type="button">保存 API 设置</button>
-        <p id="settingsStatus" class="mini-status">未加载设置</p>
+        <p id="settingsStatus" class="mini-status">静态托管下需要后端 API 才能保存设置。</p>
       </form>
     </dialog>
 
-    <script src="./app.js" type="module"></script>
+    <script src="./public/app.js" type="module"></script>
   </body>
 </html>

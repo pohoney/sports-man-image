@@ -10,7 +10,7 @@ const outputDir = path.join(__dirname, "output", "images");
 const jobsDir = path.join(__dirname, "output", "jobs");
 const settingsPath = path.join(__dirname, "output", "api-settings.json");
 const port = Number(process.env.PORT || 4173);
-const host = process.env.HOST || "127.0.0.1";
+const host = process.env.HOST || "0.0.0.0";
 const activeJobs = new Map();
 
 const defaultSettings = {
