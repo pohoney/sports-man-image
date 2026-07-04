@@ -1,28 +1,35 @@
+const stylePreviewVersion = "2026-07-05-2863d0a";
+const stylePreviewUrl = (filename) => {
+  const url = new URL(`./assets/${filename}`, import.meta.url);
+  url.searchParams.set("v", stylePreviewVersion);
+  return url.href;
+};
+
 const styleMeta = {
   "A 写实摄影风": {
     id: "realistic",
     description: "真实运动摄影，高细节，自然光影。",
-    cover: new URL("./assets/style-realistic.png", import.meta.url).pathname
+    cover: stylePreviewUrl("style-realistic.png")
   },
   "B 复古艺术纪实摄影": {
     id: "retro-documentary",
     description: "高调黑白，复古体育纪实，慢门拖影。",
-    cover: new URL("./assets/style-retro-documentary.png", import.meta.url).pathname
+    cover: stylePreviewUrl("style-retro-documentary.png")
   },
   "C 胶片动能抓拍": {
     id: "kinetic-detail",
     description: "粗粝胶片，动能细节特写，荷兰角。",
-    cover: new URL("./assets/style-kinetic-detail.png", import.meta.url).pathname
+    cover: stylePreviewUrl("style-kinetic-detail.png")
   },
   "D 高速摇摄": {
     id: "high-speed-panning",
     description: "高速摇摄，主体清晰，背景速度拖影。",
-    cover: new URL("./assets/style-high-speed-panning.png", import.meta.url).pathname
+    cover: stylePreviewUrl("style-high-speed-panning.png")
   },
   "E 戏剧性肖像": {
     id: "cinematic-portrait",
     description: "低调棚拍，戏剧明暗，边缘光肖像。",
-    cover: new URL("./assets/style-cinematic-portrait.png", import.meta.url).pathname
+    cover: stylePreviewUrl("style-cinematic-portrait.png")
   }
 };
 
