@@ -1,19 +1,61 @@
-const styles = [
-  {
+const styleMeta = {
+  "A 写实摄影风": {
     id: "realistic",
+    description: "真实运动摄影，高细节，自然光影。",
+    cover: new URL("./assets/style-realistic.png", import.meta.url).pathname
+  },
+  "B 复古艺术纪实摄影": {
+    id: "retro-documentary",
+    description: "高调黑白，复古体育纪实，慢门拖影。",
+    cover: new URL("./assets/style-retro-documentary.png", import.meta.url).pathname
+  },
+  "C 胶片动能抓拍": {
+    id: "kinetic-detail",
+    description: "粗粝胶片，动能细节特写，荷兰角。",
+    cover: new URL("./assets/style-kinetic-detail.png", import.meta.url).pathname
+  },
+  "D 高速摇摄": {
+    id: "high-speed-panning",
+    description: "高速摇摄，主体清晰，背景速度拖影。",
+    cover: new URL("./assets/style-high-speed-panning.png", import.meta.url).pathname
+  },
+  "E 戏剧性肖像": {
+    id: "cinematic-portrait",
+    description: "低调棚拍，戏剧明暗，边缘光肖像。",
+    cover: new URL("./assets/style-cinematic-portrait.png", import.meta.url).pathname
+  }
+};
+
+let styles = [
+  {
     label: "A 写实摄影风",
-    description: "商业体育海报感，强方向光，高对比。",
-    cover: new URL("./assets/style-realistic.png", import.meta.url).pathname,
+    ...styleMeta["A 写实摄影风"],
     prompt:
-      "realistic sports photography, commercial athletic poster, crisp details, high contrast lighting, vivid color grading"
+      "realistic photography, professional sports photography, high detail, natural lighting, shallow depth of field, bokeh, athletic physique, sweat droplets, dynamic action shot, professional camera quality"
   },
   {
-    id: "vintage",
     label: "B 复古艺术纪实摄影",
-    description: "胶片色彩，运动拖影，街头运动纪实。",
-    cover: new URL("./assets/style-vintage.png", import.meta.url).pathname,
+    ...styleMeta["B 复古艺术纪实摄影"],
     prompt:
-      "vintage documentary sports photography, film grain, cinematic film color, muted colors, candid athletic moment, motion trail behind limbs or equipment"
+      "high-speed motion blur photography, retro sports photography aesthetic, simulated film style, grainy film texture, 1970s sports fashion, classic tournament style, minimalist high-key lighting"
+  },
+  {
+    label: "C 胶片动能抓拍",
+    ...styleMeta["C 胶片动能抓拍"],
+    prompt:
+      "retro analog sports photography aesthetic, 1970s editorial vibe, gritty film texture, intentional macro close-up focus on kinetic details, limbs, footwear, racket, ball, motion blur rather than full-body clarity, high-speed capture aesthetic, raw and unpolished documentary feel"
+  },
+  {
+    label: "D 高速摇摄",
+    ...styleMeta["D 高速摇摄"],
+    prompt:
+      "high-speed motion blur photography, retro sports photography aesthetic, simulated film style, grainy film texture, minimalist high-key lighting, selective focus on face and torso with motion-blurred extremities, dynamic panning photography technique, cinematic sports editorial vibe"
+  },
+  {
+    label: "E 戏剧性肖像",
+    ...styleMeta["E 戏剧性肖像"],
+    prompt:
+      "low-key studio sports photography, dramatic chiaroscuro lighting aesthetic, cinematic athletic portrait style, high-contrast silhouette emphasis, minimalist studio composition, focus on form and shadow play, professional fashion-sports editorial vibe, studio portrait photography technique with controlled rim lighting, tight framing on subject details, low-key exposure control"
   }
 ];
 
@@ -381,6 +423,39 @@ function currentSummary() {
   };
 }
 
+function parseStyleDescription(markdown) {
+  const blocks = [...markdown.matchAll(/^##\s+([A-E]\s+[^\n]+)\n([\s\S]*?)(?=^##\s+[A-E]\s+|\s*$)/gm)];
+  return blocks
+    .map((match) => {
+      const label = match[1].trim();
+      const body = match[2];
+      const promptMatch = body.match(/####\s+--style\s*\n+([^\n]+)/);
+      const meta = styleMeta[label];
+      if (!meta || !promptMatch) return null;
+      return {
+        label,
+        ...meta,
+        prompt: promptMatch[1].trim()
+      };
+    })
+    .filter(Boolean);
+}
+
+async function loadStyleDescriptions() {
+  try {
+    const styleSource = new URL("./data/style-description.md", import.meta.url);
+    const response = await fetch(styleSource, { cache: "no-store" });
+    if (!response.ok) throw new Error("style markdown unavailable");
+    const parsedStyles = parseStyleDescription(await response.text());
+    if (!parsedStyles.length) throw new Error("style markdown has no styles");
+    const activeStyleId = state.style?.id || styles[1]?.id;
+    styles = parsedStyles;
+    state.style = styles.find((style) => style.id === activeStyleId) || styles[1] || styles[0];
+  } catch {
+    state.style = styles.find((style) => style.id === state.style?.id) || styles[1] || styles[0];
+  }
+}
+
 async function loadSettings() {
   try {
     const response = await fetch("/api/settings");
@@ -711,6 +786,11 @@ $("#galleryFilter").addEventListener("change", () => {
   renderGallery();
 });
 
-render();
-loadSettings();
-loadGallery();
+async function init() {
+  await loadStyleDescriptions();
+  render();
+  loadSettings();
+  loadGallery();
+}
+
+init();
