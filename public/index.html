@@ -40,33 +40,37 @@
           </div>
         </header>
 
-        <nav id="tabs" class="tabs" aria-label="Dimension tabs"></nav>
+        <div class="dimension-shell">
+          <nav id="tabs" class="tabs" aria-label="Dimension tabs"></nav>
+        </div>
 
-        <section class="dimension-card">
-          <div class="dimension-title">
-            <div>
-              <p id="tabKicker" class="kicker">Dimension</p>
-              <h3 id="tabTitle">Sport</h3>
+        <div class="workspace-grid">
+          <section class="dimension-card">
+            <div class="dimension-title">
+              <div>
+                <p id="tabKicker" class="kicker">Dimension</p>
+                <h3 id="tabTitle">Sport</h3>
+              </div>
+              <p id="tabHint"></p>
             </div>
-            <p id="tabHint"></p>
-          </div>
-          <div id="dimensionOptions" class="option-grid"></div>
-        </section>
+            <div id="dimensionOptions" class="option-grid"></div>
+          </section>
 
-        <section class="prompt-card prompt-dock">
-          <div class="prompt-head">
-            <div>
-              <p class="kicker">Live Prompt</p>
-              <h2>预览与复制</h2>
+          <section class="prompt-card prompt-dock">
+            <div class="prompt-head">
+              <div>
+                <p class="kicker">Live Prompt</p>
+                <h2>预览与复制</h2>
+              </div>
+              <button id="copyPrompt" class="ghost-button" type="button">复制</button>
             </div>
-            <button id="copyPrompt" class="ghost-button" type="button">复制</button>
-          </div>
-          <textarea id="promptPreview" spellcheck="false"></textarea>
-          <div class="prompt-actions">
-            <button id="generateButton" class="primary-button" type="button">开始生图</button>
-            <p id="statusText">输出目录：output/images</p>
-          </div>
-        </section>
+            <textarea id="promptPreview" spellcheck="false"></textarea>
+            <div class="prompt-actions">
+              <button id="generateButton" class="primary-button" type="button">开始生图</button>
+              <p id="statusText">输出目录：output/images</p>
+            </div>
+          </section>
+        </div>
       </main>
     </div>
 

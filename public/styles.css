@@ -296,10 +296,14 @@ select {
 }
 
 .workspace {
-  padding: 26px;
+  padding: clamp(18px, 2.2vw, 34px);
   display: flex;
   min-height: 100dvh;
   flex-direction: column;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 94% 8%, rgba(214, 66, 32, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 250, 0.64), rgba(243, 243, 234, 0));
 }
 
 .topbar {
@@ -307,7 +311,14 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 22px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1420px;
+  border: 1px solid rgba(216, 216, 210, 0.82);
+  border-radius: calc(var(--radius) + 4px);
+  background: rgba(255, 255, 250, 0.74);
+  padding: 14px 16px;
+  backdrop-filter: blur(16px);
 }
 
 .title-row {
@@ -337,24 +348,50 @@ select {
   font-weight: 800;
 }
 
+.dimension-shell,
+.workspace-grid {
+  width: 100%;
+  max-width: 1420px;
+  margin: 0 auto;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.43fr);
+  align-items: start;
+  gap: 18px;
+  min-height: 0;
+}
+
 .tabs {
   position: relative;
   z-index: 3;
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(106px, 1fr);
+  gap: 6px;
   overflow-x: auto;
-  min-height: 48px;
-  margin-bottom: 14px;
-  padding-bottom: 6px;
+  border: 1px solid rgba(216, 216, 210, 0.9);
+  border-radius: calc(var(--radius) + 4px);
+  background: rgba(255, 255, 250, 0.66);
+  padding: 6px;
+  backdrop-filter: blur(16px);
 }
 
 .tab-button {
-  flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 250, 0.78);
-  padding: 10px 14px;
+  border-radius: calc(var(--radius) - 2px);
+  background: transparent;
+  padding: 11px 12px;
   color: var(--muted);
+  font-size: 13px;
+  font-weight: 760;
+  text-align: center;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
 }
 
 .top-actions .ghost-button {
@@ -368,13 +405,14 @@ select {
   border-color: var(--ink);
   background: var(--ink);
   color: #fffdf7;
+  box-shadow: 3px 3px 0 rgba(20, 20, 20, 0.22);
 }
 
 .dimension-card,
 .prompt-card,
 .gallery-card {
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 4px);
   background: rgba(255, 255, 250, 0.88);
   box-shadow: var(--shadow);
 }
@@ -384,51 +422,62 @@ select {
   z-index: 2;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  padding: 22px;
-  height: clamp(630px, 87dvh, 930px);
+  padding: 0;
+  height: calc(100dvh - 144px);
+  min-height: 600px;
+  max-height: 910px;
   overflow: hidden;
 }
 
 .dimension-title {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: start;
-  padding-bottom: 20px;
+  display: grid;
+  grid-template-columns: minmax(190px, 0.45fr) minmax(260px, 1fr);
+  gap: clamp(18px, 3vw, 42px);
+  align-items: end;
+  padding: clamp(18px, 2.2vw, 28px);
   border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 246, 232, 0.95), rgba(255, 255, 250, 0.74)),
+    var(--paper);
 }
 
 .dimension-title p:last-child {
-  max-width: 420px;
+  max-width: 680px;
   color: var(--muted);
   line-height: 1.5;
+  font-size: 14px;
 }
 
 .option-grid {
   display: grid;
-  gap: 18px;
+  align-content: start;
+  gap: 22px;
   min-height: 0;
   overflow: auto;
-  margin: 0 -10px -10px;
-  padding: 22px 14px 18px;
+  margin: 0;
+  padding: clamp(18px, 2.2vw, 28px);
 }
 
 .option-group {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(128px, 0.22fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
 .option-group + .option-group {
   border-top: 1px solid var(--line);
-  padding-top: 18px;
+  padding-top: 22px;
 }
 
 .option-group-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 8px;
   color: var(--muted);
   font-size: 12px;
+  padding-top: 2px;
 }
 
 .option-group-title span {
@@ -439,21 +488,49 @@ select {
 
 .option-group-title small {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: calc(var(--radius) - 2px);
   padding: 3px 8px;
   background: rgba(255, 255, 250, 0.68);
+  width: fit-content;
+  color: var(--accent-dark);
+  font-weight: 760;
 }
 
 .option-group-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
-  padding: 4px 5px 8px;
+  padding: 0;
 }
 
 .option-card {
-  min-height: 82px;
-  padding: 12px;
+  min-height: 96px;
+  padding: 14px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  box-shadow: none;
+}
+
+.option-card:hover,
+.tab-button:hover,
+.ghost-button:hover,
+.icon-button:hover {
+  border-color: rgba(20, 20, 20, 0.46);
+  background: #fffdf7;
+  transform: translateY(-1px);
+}
+
+.option-card strong {
+  font-size: 14px;
+  line-height: 1.15;
+}
+
+.option-card span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .prompt-card,
@@ -462,9 +539,16 @@ select {
 }
 
 .prompt-dock {
-  position: relative;
+  position: sticky;
+  top: 18px;
   z-index: 1;
-  margin-top: 22px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  min-height: 520px;
+  max-height: calc(100dvh - 144px);
+  overflow: hidden;
+  padding: 18px;
 }
 
 .prompt-head {
@@ -477,24 +561,26 @@ select {
 
 #promptPreview {
   width: 100%;
-  min-height: 132px;
+  min-height: 0;
+  flex: 1;
   resize: vertical;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 16px;
   background: #171713;
   color: #fffaf0;
   line-height: 1.55;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .prompt-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .primary-button,
@@ -532,6 +618,11 @@ select {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+  min-height: 34px;
+  border: 1px solid rgba(216, 216, 210, 0.74);
+  border-radius: var(--radius);
+  background: rgba(237, 237, 222, 0.42);
+  padding: 9px 10px;
 }
 
 .gallery {
@@ -737,6 +828,26 @@ select {
     height: clamp(570px, 84dvh, 840px);
   }
 
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dimension-title,
+  .option-group {
+    grid-template-columns: 1fr;
+  }
+
+  .option-group-title {
+    position: static;
+  }
+
+  .prompt-dock {
+    position: relative;
+    top: auto;
+    min-height: 420px;
+    max-height: none;
+  }
+
   .prompt-actions {
     align-items: stretch;
     flex-direction: column;
@@ -744,6 +855,17 @@ select {
 }
 
 @media (max-width: 1180px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-dock {
+    position: relative;
+    top: auto;
+    min-height: 440px;
+    max-height: none;
+  }
+
   .gallery-view {
     --gallery-title-size: 21px;
     --gallery-control-height: 32px;
