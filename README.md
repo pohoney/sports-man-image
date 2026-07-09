@@ -15,6 +15,40 @@ npm start
 http://127.0.0.1:4173
 ```
 
+## EdgeOne 部署
+
+这个项目不能只按纯静态站点部署，否则页面会提示「当前是静态托管页面，不能保存 API 设置」。原因是 API 设置、生图、图库都需要后端接口。
+
+已内置 EdgeOne Functions：
+
+```text
+edge-functions/api/settings.js
+edge-functions/api/generate.js
+edge-functions/api/images.js
+edge-functions/api/image.js
+edge-functions/api/download.js
+```
+
+部署到 EdgeOne 时请选择支持 Functions 的全栈/Pages Functions 部署方式。部署后：
+
+- `POST /api/settings` 会把设置保存到 EdgeOne Blob
+- `POST /api/generate` 会调用 OpenAI-compatible 生图接口
+- 生成图片会写入 EdgeOne Blob，并显示在图库中
+
+推荐在 EdgeOne 环境变量中配置 API Key：
+
+```text
+SPORTS_MAN_API_KEY=你的生图 API Key
+```
+
+也兼容：
+
+```text
+OPENAI_API_KEY=你的生图 API Key
+```
+
+如果没有配置环境变量，也可以在页面的 Image API 设置里填写 API Key；GET 设置接口不会把 Key 回传给浏览器，只会显示是否已设置。
+
 ## 生图链路
 
 前端点击「开始生图」后，根据左侧 Image API 设置选择生成方式：

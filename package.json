@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@edgeone/pages-blob": "^0.0.14"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"

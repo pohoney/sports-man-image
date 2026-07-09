@@ -744,6 +744,12 @@ async function generate() {
     if (!response.ok || !data.ok) {
       throw new Error(data.error || "生成失败");
     }
+    if (data.status === "done" || data.images?.length) {
+      state.galleryImages = data.gallery || data.images || [];
+      $("#statusText").textContent = "生成完成，已写入图库。";
+      renderGalleryFilters();
+      return;
+    }
     await pollJob(data.jobId);
   } catch (error) {
     $("#statusText").textContent = `生成失败：${error.message}`;
