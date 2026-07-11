@@ -733,7 +733,7 @@ function showGallery() {
 async function generate() {
   const button = $("#generateButton");
   button.disabled = true;
-  $("#statusText").textContent = "已提交生成任务，正在启动 Codex。";
+  $("#statusText").textContent = state.api.provider === "custom" ? "已提交生成任务，正在调用生图 API。" : "已提交生成任务，正在启动 Codex。";
   try {
     const response = await fetch("/api/generate", {
       method: "POST",

@@ -16,21 +16,28 @@ async function generateImage({ prompt, settings }) {
 
   const headers = { "content-type": "application/json" };
   if (settings.custom.apiKey) headers.authorization = `Bearer ${settings.custom.apiKey}`;
+  const model = String(settings.custom.model || "").trim();
+  const requestBody = {
+    model,
+    prompt,
+    n: 1,
+    size: settings.custom.size
+  };
+  if (!model.startsWith("gpt-image")) {
+    requestBody.response_format = "b64_json";
+  }
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model: settings.custom.model,
-      prompt,
-      n: 1,
-      size: settings.custom.size,
-      response_format: "b64_json"
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401) {
+      throw new Error("OpenAI API Key 认证失败。请确认填写的是有效的 API key，通常以 sk- 或 sk-proj- 开头；不要填写 Project ID、Organization ID 或被撤销/复制不完整的 key。");
+    }
     throw new Error(`Custom API failed: ${response.status} ${text.slice(0, 600)}`);
   }
 
