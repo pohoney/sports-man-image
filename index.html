@@ -62,12 +62,15 @@
                 <p class="kicker">Live Prompt</p>
                 <h2>预览与复制</h2>
               </div>
-              <button id="copyPrompt" class="ghost-button" type="button">复制</button>
+              <div class="prompt-copy-actions" aria-label="Prompt copy actions">
+                <button id="copyPrompt" class="ghost-button" type="button">复制全部</button>
+                <button id="copyActionPrompt" class="ghost-button" type="button">复制动作</button>
+              </div>
             </div>
             <textarea id="promptPreview" spellcheck="false"></textarea>
             <div class="prompt-actions">
               <button id="generateButton" class="primary-button" type="button">开始生图</button>
-              <p id="statusText">静态预览模式：可选择维度与复制 prompt</p>
+              <p id="statusText">输出目录：output/images</p>
             </div>
           </section>
         </div>
@@ -76,11 +79,15 @@
 
     <section class="gallery-view" id="galleryView" hidden>
       <header class="gallery-topbar">
-        <button id="backHome" class="gallery-title" type="button">
-          <span class="brand-mark compact">SM</span>
-          <span>sports-man gallery</span>
-        </button>
+        <div class="gallery-title-wrap">
+          <button id="galleryBackButton" class="ghost-button gallery-back-button" type="button">返回首页</button>
+          <button id="backHome" class="gallery-title" type="button">
+            <span class="brand-mark compact">SM</span>
+            <span>sports-man gallery</span>
+          </button>
+        </div>
         <div class="top-actions">
+          <button id="clearPending" class="ghost-button" type="button">清除生成中</button>
           <button id="galleryRefresh" class="icon-button" type="button" title="刷新图库" aria-label="刷新图库">↻</button>
           <select id="galleryFilter" class="gallery-filter" aria-label="按风格筛选图库">
             <option value="all">全部风格</option>
@@ -119,7 +126,7 @@
           </label>
         </div>
         <button id="saveSettings" class="primary-button full-width" type="button">保存 API 设置</button>
-        <p id="settingsStatus" class="mini-status">静态托管下需要后端 API 才能保存设置。</p>
+        <p id="settingsStatus" class="mini-status">未加载设置</p>
       </form>
     </dialog>
 

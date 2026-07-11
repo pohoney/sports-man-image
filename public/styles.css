@@ -26,11 +26,7 @@
 body {
   margin: 0;
   min-height: 100dvh;
-  background:
-    linear-gradient(90deg, rgba(20, 20, 20, 0.04) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(20, 20, 20, 0.04) 1px, transparent 1px),
-    #f3f3ea;
-  background-size: 34px 34px;
+  background: #f3f3ea;
   color: var(--ink);
   font-family:
     ui-sans-serif,
@@ -559,6 +555,19 @@ select {
   margin-bottom: 14px;
 }
 
+.prompt-copy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.prompt-copy-actions .ghost-button {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
 #promptPreview {
   width: 100%;
   min-height: 300px;
@@ -797,14 +806,6 @@ select {
   font-size: var(--gallery-action-size);
 }
 
-.gallery-return-hint {
-  align-self: center;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
 #clearPending {
   min-height: var(--gallery-control-height);
   padding: 0 10px;
@@ -830,6 +831,19 @@ select {
   gap: 18px;
   margin: 0 auto 22px;
   max-width: 1480px;
+}
+
+.gallery-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.gallery-back-button {
+  min-height: var(--gallery-control-height);
+  padding: 0 12px;
+  font-size: var(--gallery-action-size);
 }
 
 .gallery-title {
@@ -981,12 +995,13 @@ select {
     gap: 10px;
   }
 
-  .gallery-filter {
-    max-width: 126px;
+  .gallery-title-wrap,
+  .prompt-copy-actions {
+    justify-content: flex-start;
   }
 
-  .gallery-return-hint {
-    display: none;
+  .gallery-filter {
+    max-width: 126px;
   }
 
   .gallery-waterfall {

@@ -395,6 +395,10 @@ function currentPrompt() {
     .join(", ");
 }
 
+function currentActionPrompt() {
+  return [state.selected.pose, "accurate sport-specific body mechanics"].filter(Boolean).join(", ");
+}
+
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
@@ -696,7 +700,15 @@ function renderPrompt() {
 
 async function copyPrompt() {
   await navigator.clipboard.writeText($("#promptPreview").value);
-  $("#statusText").textContent = "Prompt 已复制。";
+  $("#statusText").textContent = "完整 prompt 已复制。";
+  setTimeout(() => {
+    $("#statusText").textContent = "输出目录：output/images";
+  }, 1600);
+}
+
+async function copyActionPrompt() {
+  await navigator.clipboard.writeText(currentActionPrompt());
+  $("#statusText").textContent = "动作 prompt 已复制。";
   setTimeout(() => {
     $("#statusText").textContent = "输出目录：output/images";
   }, 1600);
@@ -952,11 +964,13 @@ function render() {
 }
 
 $("#copyPrompt").addEventListener("click", copyPrompt);
+$("#copyActionPrompt").addEventListener("click", copyActionPrompt);
 $("#generateButton").addEventListener("click", generate);
 $("#refreshGallery").addEventListener("click", loadGallery);
 $("#galleryRefresh").addEventListener("click", loadGallery);
 $("#clearPending").addEventListener("click", clearPendingGenerations);
 $("#openGallery").addEventListener("click", showGallery);
+$("#galleryBackButton").addEventListener("click", showHome);
 $("#backHome").addEventListener("click", showHome);
 $("#homeTitle").addEventListener("click", showHome);
 $("#openApiSettings").addEventListener("click", () => $("#apiDialog").showModal());
