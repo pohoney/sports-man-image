@@ -4,3 +4,7 @@ output/
 .env
 .env.*
 npm-debug.log*
+
+# Tencent Cloud EdgeOne
+.edgeone/*
+.tef_dist/*
