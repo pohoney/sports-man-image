@@ -424,6 +424,7 @@ function writeLocalSettings(settings) {
 
 function mergeSettings(serverSettings, localSettings) {
   const base = serverSettings || state.settings;
+  const localApiKey = localSettings?.custom?.apiKey || "";
   if (!localSettings) return base;
   return {
     ...base,
@@ -431,7 +432,7 @@ function mergeSettings(serverSettings, localSettings) {
     custom: {
       ...(base.custom || {}),
       ...(localSettings.custom || {}),
-      apiKeySet: Boolean(localSettings.custom?.apiKey || base.custom?.apiKeySet)
+      apiKeySet: Boolean(localApiKey)
     }
   };
 }
@@ -531,11 +532,9 @@ async function loadSettings() {
     $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
     $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
     $("#apiSize").value = state.settings.custom?.size || "1024x1536";
-    $("#settingsStatus").textContent = state.settings.custom?.apiKeySet
-      ? localSettings?.custom?.apiKey
-        ? "已保存 API Key（当前浏览器）。"
-        : "已保存 API Key。"
-      : "尚未保存 API Key。";
+    $("#settingsStatus").textContent = localSettings?.custom?.apiKey
+      ? "已加载当前浏览器保存的 API Key。"
+      : "尚未在当前浏览器保存 API Key。分享给别人时，对方需要保存自己的 key。";
   } catch {
     if (localSettings) {
       state.settings = mergeSettings(state.settings, localSettings);
@@ -552,22 +551,10 @@ async function loadSettings() {
 
 async function saveSettings() {
   const body = settingsPayloadFromForm();
-  try {
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    if (!response.ok) throw new Error("settings api unavailable");
-    state.settings = await response.json();
-    $("#apiKey").value = "";
-    $("#settingsStatus").textContent = `已保存：${state.settings.provider === "custom" ? "我的生图 API" : "Codex CLI"}`;
-  } catch {
-    writeLocalSettings(body);
-    state.settings = mergeSettings(state.settings, body);
-    $("#apiKey").value = "";
-    $("#settingsStatus").textContent = "服务端设置保存失败，已保存到当前浏览器；生图时会随请求发送。";
-  }
+  writeLocalSettings(body);
+  state.settings = mergeSettings(state.settings, body);
+  $("#apiKey").value = "";
+  $("#settingsStatus").textContent = "已保存到当前浏览器；不会写入共享服务器，生图时会临时随请求发送。";
 }
 
 function renderStyles() {
