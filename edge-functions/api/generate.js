@@ -10,6 +10,8 @@ import {
   writeImageIndex
 } from "./_shared.js";
 
+const GENERATION_TIMEOUT_MS = 135000;
+
 async function generateImage({ prompt, settings }) {
   const endpoint = settings.custom.endpoint.trim();
   if (!endpoint) throw new Error("Custom API endpoint is empty.");
@@ -26,12 +28,25 @@ async function generateImage({ prompt, settings }) {
   if (!model.startsWith("gpt-image")) {
     requestBody.response_format = "b64_json";
   }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GENERATION_TIMEOUT_MS);
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody)
-  });
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("生图 API 响应超时。GPT Image 复杂 prompt 可能接近 2 分钟，请稍后重试，或先降低尺寸/质量后再生成。");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const text = await response.text();

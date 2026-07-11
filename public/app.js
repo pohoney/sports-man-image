@@ -734,11 +734,14 @@ async function generate() {
   const button = $("#generateButton");
   button.disabled = true;
   $("#statusText").textContent = state.api.provider === "custom" ? "已提交生成任务，正在调用生图 API。" : "已提交生成任务，正在启动 Codex。";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 150000);
   try {
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt: currentPrompt(), state, summary: currentSummary() })
+      body: JSON.stringify({ prompt: currentPrompt(), state, summary: currentSummary() }),
+      signal: controller.signal
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {
@@ -752,8 +755,13 @@ async function generate() {
     }
     await pollJob(data.jobId);
   } catch (error) {
-    $("#statusText").textContent = `生成失败：${error.message}`;
+    const message =
+      error.name === "AbortError"
+        ? "生图等待超时。GPT Image 复杂 prompt 可能接近 2 分钟，请稍后重试，或先降低尺寸后再生成。"
+        : error.message;
+    $("#statusText").textContent = `生成失败：${message}`;
   } finally {
+    clearTimeout(timeout);
     button.disabled = false;
   }
 }
