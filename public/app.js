@@ -316,6 +316,7 @@ const state = {
   style: styles[1],
   activeTab: "sport",
   galleryImages: [],
+  pendingGenerations: [],
   galleryFilter: "all",
   settings: {
     provider: "codex",
@@ -655,7 +656,9 @@ async function loadGallery() {
 }
 
 function renderGalleryFilters() {
-  const stylesInGallery = unique(state.galleryImages.map((image) => image.meta?.style).filter(Boolean));
+  const stylesInGallery = unique(
+    [...state.pendingGenerations, ...state.galleryImages].map((image) => image.meta?.style).filter(Boolean)
+  );
   $("#galleryFilter").innerHTML = [
     `<option value="all">全部风格</option>`,
     ...stylesInGallery.map((style) => `<option value="${escapeHtml(style)}">${escapeHtml(style)}</option>`)
@@ -667,10 +670,11 @@ function renderGalleryFilters() {
 }
 
 function renderGallery() {
+  const galleryItems = [...state.pendingGenerations, ...state.galleryImages];
   const images =
     state.galleryFilter === "all"
-      ? state.galleryImages
-      : state.galleryImages.filter((image) => image.meta?.style === state.galleryFilter);
+      ? galleryItems
+      : galleryItems.filter((image) => image.meta?.style === state.galleryFilter);
   if (!images.length) {
     $("#gallery").innerHTML = `<div class="empty">还没有生成图。回到首页点击「开始生图」后，图片会自动出现在这里。</div>`;
     return;
@@ -679,6 +683,24 @@ function renderGallery() {
     .map((image, index) => {
       const meta = image.meta || {};
       const dimensions = meta.dimensions || {};
+      if (image.pending) {
+        return `
+          <figure class="image-tile image-tile-pending ${image.failed ? "failed" : ""}">
+            <div class="pending-preview" aria-label="生成中">
+              <span class="pending-spinner"></span>
+              <strong>${image.failed ? "生成失败" : "生图中"}</strong>
+              <small>${escapeHtml(image.statusText || "已提交生成指令，正在等待图像返回。")}</small>
+            </div>
+            <figcaption class="image-meta">
+              <strong>${escapeHtml(image.name)}</strong>
+              <div class="chip-row">
+                ${(image.chips || []).map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`).join("")}
+              </div>
+              <p class="pending-note">${escapeHtml(image.promptSnippet || "")}</p>
+            </figcaption>
+          </figure>
+        `;
+      }
       const chips = [
         meta.style || "未记录风格",
         meta.sport || "未记录运动",
@@ -719,6 +741,52 @@ function renderGallery() {
   });
 }
 
+function createPendingGeneration() {
+  const summary = currentSummary();
+  const prompt = currentPrompt();
+  return {
+    id: `pending-${Date.now()}`,
+    pending: true,
+    name: `生成任务 ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`,
+    statusText: "正在调用生图 API，请保持页面打开。",
+    promptSnippet: prompt.slice(0, 150),
+    chips: [summary.style, summary.sport, summary.dimensions.pose, summary.dimensions.background, summary.dimensions.color].filter(Boolean),
+    meta: {
+      style: summary.style,
+      sport: summary.sport,
+      dimensions: summary.dimensions,
+      provider: state.settings.provider || "custom"
+    }
+  };
+}
+
+function upsertPendingGeneration(item) {
+  state.pendingGenerations = [item, ...state.pendingGenerations.filter((pending) => pending.id !== item.id)];
+  renderGalleryFilters();
+  renderGallery();
+}
+
+function completePendingGeneration(id) {
+  state.pendingGenerations = state.pendingGenerations.filter((pending) => pending.id !== id);
+  renderGalleryFilters();
+  renderGallery();
+}
+
+function failPendingGeneration(id, message) {
+  state.pendingGenerations = state.pendingGenerations.map((pending) =>
+    pending.id === id
+      ? {
+          ...pending,
+          pending: true,
+          statusText: `生成失败：${message}`,
+          failed: true
+        }
+      : pending
+  );
+  renderGalleryFilters();
+  renderGallery();
+}
+
 function showHome() {
   $("#homeView").hidden = false;
   $("#galleryView").hidden = true;
@@ -733,7 +801,11 @@ function showGallery() {
 async function generate() {
   const button = $("#generateButton");
   button.disabled = true;
-  $("#statusText").textContent = state.api.provider === "custom" ? "已提交生成任务，正在调用生图 API。" : "已提交生成任务，正在启动 Codex。";
+  const pending = createPendingGeneration();
+  $("#statusText").textContent = state.settings.provider === "custom" ? "已提交生成任务，正在调用生图 API。" : "已提交生成任务，正在启动 Codex。";
+  $("#homeView").hidden = true;
+  $("#galleryView").hidden = false;
+  upsertPendingGeneration(pending);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 150000);
   try {
@@ -749,16 +821,19 @@ async function generate() {
     }
     if (data.status === "done" || data.images?.length) {
       state.galleryImages = data.gallery || data.images || [];
+      completePendingGeneration(pending.id);
       $("#statusText").textContent = "生成完成，已写入图库。";
       renderGalleryFilters();
+      renderGallery();
       return;
     }
-    await pollJob(data.jobId);
+    await pollJob(data.jobId, pending.id);
   } catch (error) {
     const message =
       error.name === "AbortError"
         ? "生图等待超时。GPT Image 复杂 prompt 可能接近 2 分钟，请稍后重试，或先降低尺寸后再生成。"
         : error.message;
+    failPendingGeneration(pending.id, message);
     $("#statusText").textContent = `生成失败：${message}`;
   } finally {
     clearTimeout(timeout);
@@ -766,23 +841,32 @@ async function generate() {
   }
 }
 
-async function pollJob(jobId) {
+async function pollJob(jobId, pendingId) {
   for (let attempt = 0; attempt < 180; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
     const data = await response.json();
     if (data.status === "done") {
       state.galleryImages = data.gallery || data.images || [];
+      completePendingGeneration(pendingId);
       renderGalleryFilters();
       renderGallery();
       $("#statusText").textContent = `生成完成：${(data.images || []).length} 张图已加载。`;
       return;
     }
     if (data.status === "error") {
+      failPendingGeneration(pendingId, data.error || "生成失败");
       throw new Error(data.error || "生成失败");
     }
+    state.pendingGenerations = state.pendingGenerations.map((pending) =>
+      pending.id === pendingId
+        ? { ...pending, statusText: `生成中：${jobId}，已等待 ${Math.round((attempt + 1) * 2)} 秒。` }
+        : pending
+    );
+    renderGallery();
     $("#statusText").textContent = `生成中：${jobId}，已等待 ${Math.round((attempt + 1) * 2)} 秒。`;
   }
+  failPendingGeneration(pendingId, "生成仍在运行，请稍后点刷新图库。");
   throw new Error("生成仍在运行，请稍后点刷新图库。");
 }
 

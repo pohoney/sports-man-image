@@ -659,6 +659,70 @@ select {
   object-fit: cover;
 }
 
+.image-tile-pending {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgba(255, 246, 232, 0.88), rgba(255, 255, 250, 0.94)),
+    var(--soft);
+}
+
+.image-tile-pending.failed {
+  border-color: rgba(170, 42, 24, 0.45);
+  background:
+    linear-gradient(135deg, rgba(255, 238, 232, 0.86), rgba(255, 255, 250, 0.94)),
+    var(--soft);
+}
+
+.pending-preview {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 180px;
+  padding: 22px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.pending-preview strong {
+  font-size: 16px;
+}
+
+.pending-preview small,
+.pending-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pending-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(216, 216, 210, 0.9);
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  animation: spin 900ms linear infinite;
+}
+
+.image-tile-pending.failed .pending-spinner {
+  border-color: rgba(170, 42, 24, 0.24);
+  border-top-color: var(--accent-dark);
+  animation: none;
+}
+
+.pending-note {
+  display: -webkit-box;
+  margin-top: 8px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .image-meta {
   padding: var(--gallery-card-padding);
 }
