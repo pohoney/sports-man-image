@@ -77,7 +77,15 @@ export async function onRequest({ request }) {
     const prompt = String(body.prompt || "").trim();
     if (!prompt) return json({ error: "Prompt is required" }, { status: 400 });
 
-    const settings = await readSettings({ includeKey: true });
+    const savedSettings = await readSettings({ includeKey: true });
+    const requestSettings = body.settings?.custom
+      ? {
+          ...savedSettings,
+          ...body.settings,
+          custom: { ...savedSettings.custom, ...body.settings.custom }
+        }
+      : savedSettings;
+    const settings = requestSettings;
     if (!settings.custom.apiKey) {
       return json({ error: "API Key is not configured. Open Image API settings and save an API Key first." }, { status: 400 });
     }

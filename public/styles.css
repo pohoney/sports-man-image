@@ -797,6 +797,20 @@ select {
   font-size: var(--gallery-action-size);
 }
 
+.gallery-return-hint {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+#clearPending {
+  min-height: var(--gallery-control-height);
+  padding: 0 10px;
+  font-size: var(--gallery-action-size);
+}
+
 .gallery-view {
   --gallery-title-size: 24px;
   --gallery-control-height: 34px;
@@ -969,6 +983,10 @@ select {
 
   .gallery-filter {
     max-width: 126px;
+  }
+
+  .gallery-return-hint {
+    display: none;
   }
 
   .gallery-waterfall {

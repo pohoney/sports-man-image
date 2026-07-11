@@ -362,6 +362,7 @@ const state = {
 };
 
 const $ = (selector) => document.querySelector(selector);
+const localSettingsKey = "sports-man-api-settings";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -403,6 +404,58 @@ function selectedValues(dimensionId) {
   if (Array.isArray(value)) return unique(value);
   if (value && typeof value === "object") return unique(Object.values(value));
   return value ? [value] : [];
+}
+
+function readLocalSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(localSettingsKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalSettings(settings) {
+  localStorage.setItem(localSettingsKey, JSON.stringify(settings));
+}
+
+function mergeSettings(serverSettings, localSettings) {
+  const base = serverSettings || state.settings;
+  if (!localSettings) return base;
+  return {
+    ...base,
+    ...localSettings,
+    custom: {
+      ...(base.custom || {}),
+      ...(localSettings.custom || {}),
+      apiKeySet: Boolean(localSettings.custom?.apiKey || base.custom?.apiKeySet)
+    }
+  };
+}
+
+function settingsPayloadFromForm() {
+  const previousLocal = readLocalSettings();
+  const apiKey = $("#apiKey").value.trim() || previousLocal?.custom?.apiKey || state.settings.custom?.apiKey || "";
+  return {
+    provider: $("#providerSelect").value,
+    custom: {
+      endpoint: $("#apiEndpoint").value.trim(),
+      apiKey,
+      model: $("#apiModel").value.trim() || "gpt-image-1",
+      size: $("#apiSize").value.trim() || "1024x1536"
+    }
+  };
+}
+
+function settingsPayloadForGenerate() {
+  const localSettings = readLocalSettings();
+  return mergeSettings(state.settings, localSettings);
+}
+
+function statePayloadForGenerate() {
+  return {
+    style: state.style,
+    selected: state.selected
+  };
 }
 
 function optionLabel(dimensionId, value) {
@@ -465,30 +518,36 @@ async function loadStyleDescriptions() {
 }
 
 async function loadSettings() {
+  const localSettings = readLocalSettings();
   try {
     const response = await fetch("/api/settings");
     if (!response.ok) throw new Error("settings api unavailable");
-    state.settings = await response.json();
+    state.settings = mergeSettings(await response.json(), localSettings);
     $("#providerSelect").value = state.settings.provider || "codex";
     $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
     $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
     $("#apiSize").value = state.settings.custom?.size || "1024x1536";
-    $("#settingsStatus").textContent = state.settings.custom?.apiKeySet ? "已保存 API Key。" : "尚未保存 API Key。";
+    $("#settingsStatus").textContent = state.settings.custom?.apiKeySet
+      ? localSettings?.custom?.apiKey
+        ? "已保存 API Key（当前浏览器）。"
+        : "已保存 API Key。"
+      : "尚未保存 API Key。";
   } catch {
-    $("#settingsStatus").textContent = "静态托管模式：API 设置需要部署后端服务。";
+    if (localSettings) {
+      state.settings = mergeSettings(state.settings, localSettings);
+      $("#providerSelect").value = state.settings.provider || "custom";
+      $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
+      $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
+      $("#apiSize").value = state.settings.custom?.size || "1024x1536";
+      $("#settingsStatus").textContent = "已加载当前浏览器保存的 API 设置。";
+      return;
+    }
+    $("#settingsStatus").textContent = "未连接到设置接口，可保存到当前浏览器后使用。";
   }
 }
 
 async function saveSettings() {
-  const body = {
-    provider: $("#providerSelect").value,
-    custom: {
-      endpoint: $("#apiEndpoint").value.trim(),
-      apiKey: $("#apiKey").value.trim(),
-      model: $("#apiModel").value.trim() || "gpt-image-1",
-      size: $("#apiSize").value.trim() || "1024x1536"
-    }
-  };
+  const body = settingsPayloadFromForm();
   try {
     const response = await fetch("/api/settings", {
       method: "POST",
@@ -500,7 +559,10 @@ async function saveSettings() {
     $("#apiKey").value = "";
     $("#settingsStatus").textContent = `已保存：${state.settings.provider === "custom" ? "我的生图 API" : "Codex CLI"}`;
   } catch {
-    $("#settingsStatus").textContent = "当前是静态托管页面，不能保存 API 设置。请部署 Node 服务或 EdgeOne Functions。";
+    writeLocalSettings(body);
+    state.settings = mergeSettings(state.settings, body);
+    $("#apiKey").value = "";
+    $("#settingsStatus").textContent = "服务端设置保存失败，已保存到当前浏览器；生图时会随请求发送。";
   }
 }
 
@@ -787,6 +849,13 @@ function failPendingGeneration(id, message) {
   renderGallery();
 }
 
+function clearPendingGenerations() {
+  state.pendingGenerations = [];
+  renderGalleryFilters();
+  renderGallery();
+  $("#statusText").textContent = "已清除生成中占位。后台请求若已发出，可能仍会继续完成。";
+}
+
 function showHome() {
   $("#homeView").hidden = false;
   $("#galleryView").hidden = true;
@@ -812,7 +881,12 @@ async function generate() {
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt: currentPrompt(), state, summary: currentSummary() }),
+      body: JSON.stringify({
+        prompt: currentPrompt(),
+        state: statePayloadForGenerate(),
+        summary: currentSummary(),
+        settings: settingsPayloadForGenerate()
+      }),
       signal: controller.signal
     });
     const data = await response.json();
@@ -881,6 +955,7 @@ $("#copyPrompt").addEventListener("click", copyPrompt);
 $("#generateButton").addEventListener("click", generate);
 $("#refreshGallery").addEventListener("click", loadGallery);
 $("#galleryRefresh").addEventListener("click", loadGallery);
+$("#clearPending").addEventListener("click", clearPendingGenerations);
 $("#openGallery").addEventListener("click", showGallery);
 $("#backHome").addEventListener("click", showHome);
 $("#homeTitle").addEventListener("click", showHome);
