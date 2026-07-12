@@ -5,6 +5,7 @@ import {
   json,
   jsonHeaders,
   metaFromBody,
+  normalizeSettings,
   readImageIndex,
   readSettings,
   writeImageIndex
@@ -16,7 +17,11 @@ async function generateImage({ prompt, settings }) {
   const endpoint = settings.custom.endpoint.trim();
   if (!endpoint) throw new Error("Custom API endpoint is empty.");
 
-  const headers = { "content-type": "application/json" };
+  const headers = {
+    "content-type": "application/json",
+    "http-referer": "https://sports-man-image.edgeone.dev",
+    "x-openrouter-title": "Sports Man Image"
+  };
   if (settings.custom.apiKey) headers.authorization = `Bearer ${settings.custom.apiKey}`;
   const model = String(settings.custom.model || "").trim();
   const requestBody = {
@@ -51,7 +56,7 @@ async function generateImage({ prompt, settings }) {
   if (!response.ok) {
     const text = await response.text();
     if (response.status === 401) {
-      throw new Error("OpenAI API Key 认证失败。请确认填写的是有效的 API key，通常以 sk- 或 sk-proj- 开头；不要填写 Project ID、Organization ID 或被撤销/复制不完整的 key。");
+      throw new Error("API Key 认证失败。OpenRouter 请填写 sk-or-v1- 开头的完整 key；OpenAI 请填写 sk- 或 sk-proj- 开头的完整 key。不要填写 Project ID、Organization ID 或复制不完整的 key。");
     }
     throw new Error(`Custom API failed: ${response.status} ${text.slice(0, 600)}`);
   }
@@ -85,7 +90,7 @@ export async function onRequest({ request }) {
           custom: { ...savedSettings.custom, ...body.settings.custom }
         }
       : savedSettings;
-    const settings = requestSettings;
+    const settings = normalizeSettings(requestSettings);
     if (!settings.custom.apiKey) {
       return json({ error: "API Key is not configured. Open Image API settings and save an API Key first." }, { status: 400 });
     }

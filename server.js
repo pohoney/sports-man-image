@@ -14,13 +14,13 @@ const host = process.env.HOST || "0.0.0.0";
 const activeJobs = new Map();
 
 const defaultSettings = {
-  provider: "codex",
+  provider: "openrouter",
   custom: {
-    endpoint: "",
+    endpoint: "https://openrouter.ai/api/v1/images",
     apiKey: "",
-    model: "gpt-image-1",
+    model: "google/gemini-3-pro-image",
     size: "1024x1536",
-    mode: "openai-compatible"
+    mode: "openrouter-images"
   }
 };
 
@@ -60,11 +60,11 @@ async function readJson(filePath, fallback) {
 
 async function readSettings({ includeKey = false } = {}) {
   const saved = await readJson(settingsPath, {});
-  const merged = {
+  const merged = normalizeSettings({
     ...defaultSettings,
     ...saved,
     custom: { ...defaultSettings.custom, ...(saved.custom || {}) }
-  };
+  });
   if (includeKey) return merged;
   return {
     ...merged,
@@ -83,12 +83,45 @@ async function saveSettings(next) {
   if (!Object.prototype.hasOwnProperty.call(next.custom || {}, "apiKey") || next.custom.apiKey === "") {
     custom.apiKey = current.custom.apiKey;
   }
-  const saved = {
-    provider: next.provider || current.provider,
+  const saved = normalizeSettings({
+    provider: next.provider === "codex" ? "openrouter" : next.provider || current.provider,
     custom
-  };
+  });
   await fs.writeFile(settingsPath, JSON.stringify(saved, null, 2), "utf8");
   return readSettings();
+}
+
+function normalizeSettings(settings) {
+  const normalized = {
+    ...defaultSettings,
+    ...(settings || {}),
+    custom: {
+      ...defaultSettings.custom,
+      ...((settings || {}).custom || {})
+    }
+  };
+  const isOpenRouter =
+    normalized.provider === "openrouter" ||
+    String(normalized.custom.apiKey || "").startsWith("sk-or-v1-") ||
+    !String(normalized.custom.endpoint || "").trim() ||
+    String(normalized.custom.endpoint || "").includes("api.openai.com/v1/images/generations") ||
+    String(normalized.custom.endpoint || "").includes("openrouter.ai") ||
+    normalized.custom.model === "gpt-image-1" ||
+    String(normalized.custom.model || "").startsWith("google/gemini");
+  if (isOpenRouter) {
+    normalized.provider = "openrouter";
+    normalized.custom.endpoint = defaultSettings.custom.endpoint;
+    if (
+      !normalized.custom.model ||
+      normalized.custom.model === "gpt-image-1" ||
+      normalized.custom.model.startsWith("openai/")
+    ) {
+      normalized.custom.model = defaultSettings.custom.model;
+    }
+    normalized.custom.size = normalized.custom.size || defaultSettings.custom.size;
+    normalized.custom.mode = "openrouter-images";
+  }
+  return normalized;
 }
 
 function imageMetaPath(file) {
@@ -193,7 +226,11 @@ async function runCustomGeneration({ jobId, prompt, resultFile, settings, meta }
   try {
     const endpoint = settings.custom.endpoint.trim();
     if (!endpoint) throw new Error("Custom API endpoint is empty.");
-    const headers = { "content-type": "application/json" };
+    const headers = {
+      "content-type": "application/json",
+      "http-referer": "https://sports-man-image.edgeone.dev",
+      "x-openrouter-title": "Sports Man Image"
+    };
     if (settings.custom.apiKey) headers.authorization = `Bearer ${settings.custom.apiKey}`;
     const response = await fetch(endpoint, {
       method: "POST",
@@ -208,6 +245,9 @@ async function runCustomGeneration({ jobId, prompt, resultFile, settings, meta }
     });
     if (!response.ok) {
       const text = await response.text();
+      if (response.status === 401) {
+        throw new Error("API Key 认证失败。OpenRouter 请填写 sk-or-v1- 开头的完整 key；OpenAI 请填写 sk- 或 sk-proj- 开头的完整 key。不要填写 Project ID、Organization ID 或复制不完整的 key。");
+      }
       throw new Error(`Custom API failed: ${response.status} ${text.slice(0, 600)}`);
     }
 
@@ -346,7 +386,16 @@ async function generate(req, res) {
   await fs.mkdir(jobsDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
 
-  const settings = await readSettings({ includeKey: true });
+  const savedSettings = await readSettings({ includeKey: true });
+  const settings = normalizeSettings(
+    body.settings?.custom
+      ? {
+          ...savedSettings,
+          ...body.settings,
+          custom: { ...savedSettings.custom, ...body.settings.custom }
+        }
+      : savedSettings
+  );
   const jobId = new Date().toISOString().replace(/[:.]/g, "-");
   const promptFile = path.join(jobsDir, `${jobId}.prompt.txt`);
   const resultFile = path.join(jobsDir, `${jobId}.result.json`);
@@ -354,7 +403,7 @@ async function generate(req, res) {
   await fs.writeFile(promptFile, prompt, "utf8");
   await fs.writeFile(path.join(jobsDir, `${jobId}.meta.json`), JSON.stringify(meta, null, 2), "utf8");
 
-  if (settings.provider === "custom") {
+  if (settings.provider !== "codex") {
     runCustomGeneration({ jobId, prompt, resultFile, settings, meta });
   } else {
     runCodexGeneration({ jobId, promptFile, resultFile, meta });

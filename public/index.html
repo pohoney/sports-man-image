@@ -108,17 +108,18 @@
         </div>
         <label class="field-label" for="providerSelect">生成方式</label>
         <select id="providerSelect">
+          <option value="openrouter">OpenRouter Nano Banana Pro</option>
           <option value="codex">Codex CLI + $imagegen</option>
           <option value="custom">我的生图 API</option>
         </select>
         <label class="field-label" for="apiEndpoint">API Endpoint</label>
-        <input id="apiEndpoint" type="url" placeholder="https://api.example.com/v1/images/generations" />
+        <input id="apiEndpoint" type="url" placeholder="https://openrouter.ai/api/v1/images" />
         <label class="field-label" for="apiKey">API Key</label>
         <input id="apiKey" type="password" placeholder="留空则保留已保存 key" />
         <div class="field-row">
           <label>
             <span>Model</span>
-            <input id="apiModel" type="text" placeholder="gpt-image-1" />
+            <input id="apiModel" type="text" placeholder="google/gemini-3-pro-image" />
           </label>
           <label>
             <span>Size</span>

@@ -319,11 +319,11 @@ const state = {
   pendingGenerations: [],
   galleryFilter: "all",
   settings: {
-    provider: "codex",
+    provider: "openrouter",
     custom: {
-      endpoint: "",
+      endpoint: "https://openrouter.ai/api/v1/images",
       apiKey: "",
-      model: "gpt-image-1",
+      model: "google/gemini-3-pro-image",
       size: "1024x1536",
       apiKeySet: false
     }
@@ -363,6 +363,14 @@ const state = {
 
 const $ = (selector) => document.querySelector(selector);
 const localSettingsKey = "sports-man-api-settings";
+const openRouterDefaults = {
+  provider: "openrouter",
+  custom: {
+    endpoint: "https://openrouter.ai/api/v1/images",
+    model: "google/gemini-3-pro-image",
+    size: "1024x1536"
+  }
+};
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -426,7 +434,7 @@ function mergeSettings(serverSettings, localSettings) {
   const base = serverSettings || state.settings;
   const localApiKey = localSettings?.custom?.apiKey || "";
   if (!localSettings) return base;
-  return {
+  return normalizeSettings({
     ...base,
     ...localSettings,
     custom: {
@@ -434,13 +442,48 @@ function mergeSettings(serverSettings, localSettings) {
       ...(localSettings.custom || {}),
       apiKeySet: Boolean(localApiKey)
     }
+  });
+}
+
+function looksLikeOpenRouter(settings) {
+  const custom = settings?.custom || {};
+  return (
+    settings?.provider === "openrouter" ||
+    String(custom.apiKey || "").startsWith("sk-or-v1-") ||
+    String(custom.endpoint || "").includes("openrouter.ai") ||
+    String(custom.model || "").startsWith("google/gemini")
+  );
+}
+
+function normalizeSettings(settings) {
+  const normalized = {
+    ...state.settings,
+    ...(settings || {}),
+    custom: {
+      ...(state.settings.custom || {}),
+      ...((settings || {}).custom || {})
+    }
   };
+  if (looksLikeOpenRouter(normalized)) {
+    normalized.provider = "openrouter";
+    normalized.custom.endpoint = openRouterDefaults.custom.endpoint;
+    normalized.custom.model = normalized.custom.model || openRouterDefaults.custom.model;
+    if (
+      !normalized.custom.model ||
+      normalized.custom.model === "gpt-image-1" ||
+      normalized.custom.model.startsWith("openai/")
+    ) {
+      normalized.custom.model = openRouterDefaults.custom.model;
+    }
+    normalized.custom.size = normalized.custom.size || openRouterDefaults.custom.size;
+  }
+  return normalized;
 }
 
 function settingsPayloadFromForm() {
   const previousLocal = readLocalSettings();
   const apiKey = $("#apiKey").value.trim() || previousLocal?.custom?.apiKey || state.settings.custom?.apiKey || "";
-  return {
+  return normalizeSettings({
     provider: $("#providerSelect").value,
     custom: {
       endpoint: $("#apiEndpoint").value.trim(),
@@ -448,12 +491,12 @@ function settingsPayloadFromForm() {
       model: $("#apiModel").value.trim() || "gpt-image-1",
       size: $("#apiSize").value.trim() || "1024x1536"
     }
-  };
+  });
 }
 
 function settingsPayloadForGenerate() {
   const localSettings = readLocalSettings();
-  return mergeSettings(state.settings, localSettings);
+  return normalizeSettings(mergeSettings(state.settings, localSettings));
 }
 
 function statePayloadForGenerate() {
@@ -527,25 +570,30 @@ async function loadSettings() {
   try {
     const response = await fetch("/api/settings");
     if (!response.ok) throw new Error("settings api unavailable");
-    state.settings = mergeSettings(await response.json(), localSettings);
-    $("#providerSelect").value = state.settings.provider || "codex";
+    state.settings = normalizeSettings(mergeSettings(await response.json(), localSettings || openRouterDefaults));
+    $("#providerSelect").value = state.settings.provider || "openrouter";
     $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
-    $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
+    $("#apiModel").value = state.settings.custom?.model || openRouterDefaults.custom.model;
     $("#apiSize").value = state.settings.custom?.size || "1024x1536";
     $("#settingsStatus").textContent = localSettings?.custom?.apiKey
       ? "已加载当前浏览器保存的 API Key。"
-      : "尚未在当前浏览器保存 API Key。分享给别人时，对方需要保存自己的 key。";
+      : "默认使用 OpenRouter Nano Banana Pro；只需要保存自己的 OpenRouter API Key。";
   } catch {
     if (localSettings) {
-      state.settings = mergeSettings(state.settings, localSettings);
-      $("#providerSelect").value = state.settings.provider || "custom";
+      state.settings = normalizeSettings(mergeSettings(state.settings, localSettings));
+      $("#providerSelect").value = state.settings.provider || "openrouter";
       $("#apiEndpoint").value = state.settings.custom?.endpoint || "";
-      $("#apiModel").value = state.settings.custom?.model || "gpt-image-1";
+      $("#apiModel").value = state.settings.custom?.model || openRouterDefaults.custom.model;
       $("#apiSize").value = state.settings.custom?.size || "1024x1536";
       $("#settingsStatus").textContent = "已加载当前浏览器保存的 API 设置。";
       return;
     }
-    $("#settingsStatus").textContent = "未连接到设置接口，可保存到当前浏览器后使用。";
+    state.settings = normalizeSettings(openRouterDefaults);
+    $("#providerSelect").value = "openrouter";
+    $("#apiEndpoint").value = openRouterDefaults.custom.endpoint;
+    $("#apiModel").value = openRouterDefaults.custom.model;
+    $("#apiSize").value = openRouterDefaults.custom.size;
+    $("#settingsStatus").textContent = "默认使用 OpenRouter Nano Banana Pro；只需要保存自己的 OpenRouter API Key。";
   }
 }
 
@@ -870,7 +918,7 @@ async function generate() {
   const button = $("#generateButton");
   button.disabled = true;
   const pending = createPendingGeneration();
-  $("#statusText").textContent = state.settings.provider === "custom" ? "已提交生成任务，正在调用生图 API。" : "已提交生成任务，正在启动 Codex。";
+  $("#statusText").textContent = state.settings.provider === "codex" ? "已提交生成任务，正在启动 Codex。" : "已提交生成任务，正在调用生图 API。";
   $("#homeView").hidden = true;
   $("#galleryView").hidden = false;
   upsertPendingGeneration(pending);

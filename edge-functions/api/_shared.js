@@ -9,15 +9,48 @@ export const jsonHeaders = {
 };
 
 export const defaultSettings = {
-  provider: "custom",
+  provider: "openrouter",
   custom: {
-    endpoint: "https://api.openai.com/v1/images/generations",
+    endpoint: "https://openrouter.ai/api/v1/images",
     apiKey: "",
-    model: "gpt-image-1",
+    model: "google/gemini-3-pro-image",
     size: "1024x1536",
-    mode: "openai-compatible"
+    mode: "openrouter-images"
   }
 };
+
+export function normalizeSettings(settings) {
+  const normalized = {
+    ...defaultSettings,
+    ...(settings || {}),
+    custom: {
+      ...defaultSettings.custom,
+      ...((settings || {}).custom || {})
+    }
+  };
+  const isOpenRouter =
+    normalized.provider === "openrouter" ||
+    String(normalized.custom.apiKey || "").startsWith("sk-or-v1-") ||
+    !String(normalized.custom.endpoint || "").trim() ||
+    String(normalized.custom.endpoint || "").includes("api.openai.com/v1/images/generations") ||
+    String(normalized.custom.endpoint || "").includes("openrouter.ai") ||
+    normalized.custom.model === "gpt-image-1" ||
+    String(normalized.custom.model || "").startsWith("google/gemini");
+  if (isOpenRouter) {
+    normalized.provider = "openrouter";
+    normalized.custom.endpoint = defaultSettings.custom.endpoint;
+    if (
+      !normalized.custom.model ||
+      normalized.custom.model === "gpt-image-1" ||
+      normalized.custom.model.startsWith("openai/")
+    ) {
+      normalized.custom.model = defaultSettings.custom.model;
+    }
+    normalized.custom.size = normalized.custom.size || defaultSettings.custom.size;
+    normalized.custom.mode = "openrouter-images";
+  }
+  return normalized;
+}
 
 export function json(data, init = {}) {
   return new Response(JSON.stringify(data), {
@@ -40,11 +73,11 @@ export async function readSettings({ includeKey = false } = {}) {
     type: "json",
     consistency: "strong"
   });
-  const merged = {
+  const merged = normalizeSettings({
     ...defaultSettings,
     ...(saved || {}),
     custom: { ...defaultSettings.custom, ...((saved || {}).custom || {}) }
-  };
+  });
   if (includeKey && !merged.custom.apiKey && envApiKey) {
     merged.custom.apiKey = envApiKey;
   }
@@ -65,8 +98,8 @@ export async function saveSettings(next) {
   if (!Object.prototype.hasOwnProperty.call(next.custom || {}, "apiKey") || next.custom.apiKey === "") {
     custom.apiKey = current.custom.apiKey;
   }
-  const provider = next.provider === "codex" ? "custom" : next.provider || current.provider || "custom";
-  const saved = { provider, custom };
+  const provider = next.provider === "codex" ? "openrouter" : next.provider || current.provider || "openrouter";
+  const saved = normalizeSettings({ provider, custom });
   await dataStore().setJSON("settings/api.json", saved);
   return readSettings();
 }
