@@ -806,6 +806,9 @@ function renderGallery() {
                 ${(image.chips || []).map((chip) => `<span class="chip">${escapeHtml(chip)}</span>`).join("")}
               </div>
               <p class="pending-note">${escapeHtml(image.promptSnippet || "")}</p>
+              <div class="image-actions">
+                <button class="delete-button" data-clear-pending="${escapeHtml(image.id)}" type="button">清除</button>
+              </div>
             </figcaption>
           </figure>
         `;
@@ -829,6 +832,7 @@ function renderGallery() {
               <a href="${image.downloadUrl || image.url}" download>下载</a>
               <a href="${image.url}" target="_blank" rel="noreferrer">查看</a>
               <button class="details-button" data-detail="${index}" type="button">维度</button>
+              <button class="delete-button" data-delete-image="${escapeHtml(image.name)}" type="button">删除</button>
             </div>
             <div class="meta-details" data-detail-panel="${index}" hidden>
               <p>属性：${escapeHtml((dimensions.attribute || []).join(" / ") || "未记录")}</p>
@@ -847,6 +851,15 @@ function renderGallery() {
       const panel = document.querySelector(`[data-detail-panel="${button.dataset.detail}"]`);
       panel.hidden = !panel.hidden;
     });
+  });
+  document.querySelectorAll("[data-clear-pending]").forEach((button) => {
+    button.addEventListener("click", () => {
+      completePendingGeneration(button.dataset.clearPending);
+      $("#statusText").textContent = "已清除该生成占位。后台请求若已发出，可能仍会继续完成。";
+    });
+  });
+  document.querySelectorAll("[data-delete-image]").forEach((button) => {
+    button.addEventListener("click", () => deleteGalleryImage(button.dataset.deleteImage, button));
   });
 }
 
@@ -901,6 +914,26 @@ function clearPendingGenerations() {
   renderGalleryFilters();
   renderGallery();
   $("#statusText").textContent = "已清除生成中占位。后台请求若已发出，可能仍会继续完成。";
+}
+
+async function deleteGalleryImage(name, button) {
+  if (!name) return;
+  button.disabled = true;
+  $("#statusText").textContent = `正在删除：${name}`;
+  try {
+    const response = await fetch(`/api/images?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || "删除失败");
+    }
+    state.galleryImages = data.images || state.galleryImages.filter((image) => image.name !== name);
+    renderGalleryFilters();
+    renderGallery();
+    $("#statusText").textContent = `已从后台删除：${name}`;
+  } catch (error) {
+    button.disabled = false;
+    $("#statusText").textContent = `删除失败：${error.message}`;
+  }
 }
 
 function showHome() {

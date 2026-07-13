@@ -153,6 +153,23 @@ async function listImages() {
   return images.sort((a, b) => b.modified - a.modified);
 }
 
+async function deleteImage(name) {
+  const file = path.basename(name || "");
+  if (!file || !/\.(png|jpe?g|webp)$/i.test(file)) {
+    return { ok: false, status: 400, error: "Invalid image name" };
+  }
+  const meta = await readJson(imageMetaPath(file), null);
+  await fs.rm(path.join(outputDir, file), { force: true });
+  await fs.rm(imageMetaPath(file), { force: true });
+  if (meta?.jobId) {
+    activeJobs.delete(meta.jobId);
+    await fs.rm(path.join(jobsDir, `${meta.jobId}.prompt.txt`), { force: true });
+    await fs.rm(path.join(jobsDir, `${meta.jobId}.result.json`), { force: true });
+    await fs.rm(path.join(jobsDir, `${meta.jobId}.meta.json`), { force: true });
+  }
+  return { ok: true, deleted: file, images: await listImages() };
+}
+
 async function serveFile(res, filePath, downloadName = "") {
   try {
     const stat = await fs.stat(filePath);
@@ -445,6 +462,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/images") {
       sendJson(res, 200, { images: await listImages() });
+      return;
+    }
+    if (req.method === "DELETE" && url.pathname === "/api/images") {
+      const result = await deleteImage(url.searchParams.get("name"));
+      sendJson(res, result.status || 200, result);
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/generate") {
