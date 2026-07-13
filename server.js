@@ -488,7 +488,8 @@ const server = http.createServer(async (req, res) => {
       await serveFile(res, path.join(outputDir, file), file);
       return;
     }
-    const staticPath = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    let staticPath = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    if (staticPath.startsWith("public/")) staticPath = staticPath.slice("public/".length);
     const filePath = path.resolve(publicDir, staticPath);
     if (!filePath.startsWith(`${publicDir}${path.sep}`) && filePath !== publicDir) {
       sendJson(res, 403, { error: "Forbidden" });
