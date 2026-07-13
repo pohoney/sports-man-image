@@ -115,6 +115,21 @@ async function runGenerationJob({ jobId, prompt, body, settings }) {
   }
 }
 
+function startGenerationJob(args) {
+  runGenerationJob(args).catch(async (error) => {
+    try {
+      await writeJob(args.jobId, {
+        status: "error",
+        provider: args.settings.provider || "openrouter",
+        error: error.message || "Generation failed",
+        finishedAt: new Date().toISOString()
+      });
+    } catch {
+      // The request has already returned; avoid surfacing background cleanup failures.
+    }
+  });
+}
+
 export async function onRequest(context) {
   const { request } = context;
   if (request.method === "OPTIONS") return new Response(null, { headers: jsonHeaders });
@@ -146,12 +161,7 @@ export async function onRequest(context) {
       createdAt: new Date().toISOString()
     });
 
-    const backgroundTask = runGenerationJob({ jobId, prompt, body, settings });
-    if (typeof context.waitUntil === "function") {
-      context.waitUntil(backgroundTask);
-    } else {
-      backgroundTask.catch(() => {});
-    }
+    startGenerationJob({ jobId, prompt, body, settings });
 
     return json({ ok: true, jobId, status: "running", provider: settings.provider || "openrouter" }, { status: 202 });
   } catch (error) {
