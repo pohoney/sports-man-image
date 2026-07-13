@@ -28,6 +28,13 @@ function bytesFromBase64(value) {
   return new Uint8Array(output);
 }
 
+function extensionFromMime(mime) {
+  const clean = String(mime || "").toLowerCase();
+  if (clean.includes("jpeg") || clean.includes("jpg")) return "jpg";
+  if (clean.includes("webp")) return "webp";
+  return "png";
+}
+
 export async function onRequest({ request }) {
   if (request.method === "OPTIONS") return new Response(null, { headers: jsonHeaders });
   if (request.method === "GET") return json({ images: await readImageIndex() });
@@ -35,7 +42,7 @@ export async function onRequest({ request }) {
     try {
       const body = await request.json();
       const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
-      const filename = `${jobId}_01.png`;
+      const filename = `${jobId}_01.${extensionFromMime(body.imageMime)}`;
       let bytes;
       if (body.imageBase64) {
         bytes = bytesFromBase64(body.imageBase64);

@@ -170,14 +170,25 @@ async function deleteImage(name) {
   return { ok: true, deleted: file, images: await listImages() };
 }
 
+function extensionFromMime(mime) {
+  const clean = String(mime || "").toLowerCase();
+  if (clean.includes("jpeg") || clean.includes("jpg")) return "jpg";
+  if (clean.includes("webp")) return "webp";
+  return "png";
+}
+
+function base64Payload(value) {
+  return String(value || "").replace(/^data:[^,]+,/, "").replace(/\s/g, "");
+}
+
 async function saveUploadedImage(body) {
   await fs.mkdir(jobsDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
   const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
-  const filename = `${jobId}_01.png`;
+  const filename = `${jobId}_01.${extensionFromMime(body.imageMime)}`;
   let bytes;
   if (body.imageBase64) {
-    bytes = Buffer.from(String(body.imageBase64), "base64");
+    bytes = Buffer.from(base64Payload(body.imageBase64), "base64");
   } else if (body.imageUrl) {
     bytes = await fetchImageBytesFromUrl(body.imageUrl);
   } else {

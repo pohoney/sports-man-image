@@ -501,16 +501,50 @@ function settingsPayloadForGenerate() {
 
 function imageFromResponsePayload(payload) {
   const first = Array.isArray(payload?.data) ? payload.data[0] : payload;
+  const b64 =
+    first?.b64_json ||
+    first?.image_base64 ||
+    first?.base64 ||
+    payload?.b64_json ||
+    payload?.image_base64 ||
+    payload?.base64;
+  const mime = String(b64 || "").match(/^data:([^;]+);base64,/)?.[1] || first?.mime_type || payload?.mime_type || "";
   return {
-    b64:
-      first?.b64_json ||
-      first?.image_base64 ||
-      first?.base64 ||
-      payload?.b64_json ||
-      payload?.image_base64 ||
-      payload?.base64,
-    url: first?.url || payload?.url || payload?.image_url
+    b64,
+    url: first?.url || payload?.url || payload?.image_url,
+    mime
   };
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function imageFromGenerationResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.startsWith("image/")) {
+    return {
+      b64: arrayBufferToBase64(await response.arrayBuffer()),
+      mime: contentType.split(";")[0]
+    };
+  }
+  if (contentType.includes("json")) {
+    return imageFromResponsePayload(await response.json());
+  }
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength) {
+    return {
+      b64: arrayBufferToBase64(buffer),
+      mime: contentType.split(";")[0] || "image/png"
+    };
+  }
+  return {};
 }
 
 function statePayloadForGenerate() {
@@ -982,6 +1016,7 @@ async function generateOpenRouterInBrowser(pending, signal) {
     method: "POST",
     headers: {
       "content-type": "application/json",
+      accept: "image/png,image/jpeg,image/webp,image/*,application/json",
       authorization: `Bearer ${apiKey}`,
       "http-referer": window.location.origin,
       "x-openrouter-title": "Sports Man Image"
@@ -996,8 +1031,7 @@ async function generateOpenRouterInBrowser(pending, signal) {
     }
     throw new Error(`OpenRouter 生图失败：${response.status} ${text.slice(0, 500)}`);
   }
-  const payload = await response.json();
-  const parsed = imageFromResponsePayload(payload);
+  const parsed = await imageFromGenerationResponse(response);
   if (!parsed.b64 && !parsed.url) {
     throw new Error("OpenRouter 返回中没有可保存的图片。");
   }
@@ -1013,7 +1047,8 @@ async function generateOpenRouterInBrowser(pending, signal) {
       state: statePayloadForGenerate(),
       summary: currentSummary(),
       imageBase64: parsed.b64,
-      imageUrl: parsed.url
+      imageUrl: parsed.url,
+      imageMime: parsed.mime
     }),
     signal
   });
