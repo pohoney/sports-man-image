@@ -7,6 +7,7 @@ import {
   metaFromBody,
   normalizeSettings,
   readImageIndex,
+  writeJob,
   readSettings,
   writeImageIndex
 } from "./_shared.js";
@@ -73,7 +74,49 @@ async function generateImage({ prompt, settings }) {
   throw new Error("Custom API response did not include b64_json, base64, image_base64, image_url, or url.");
 }
 
-export async function onRequest({ request }) {
+async function runGenerationJob({ jobId, prompt, body, settings }) {
+  try {
+    await writeJob(jobId, {
+      status: "running",
+      provider: settings.provider || "openrouter",
+      message: "Image generation is running.",
+      startedAt: new Date().toISOString()
+    });
+
+    const filename = `${jobId}_01.png`;
+    const key = `images/${filename}`;
+    const bytes = await generateImage({ prompt, settings });
+    await assetStore().set(key, bytes);
+
+    const meta = metaFromBody({ jobId, prompt, body, provider: settings.provider || "openrouter" });
+    const image = {
+      name: filename,
+      url: `/api/image?name=${encodeURIComponent(filename)}`,
+      downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`,
+      modified: Date.now(),
+      size: bytes.byteLength || 0,
+      meta
+    };
+    const images = [image, ...(await readImageIndex()).filter((item) => item.name !== filename)].slice(0, 80);
+    await writeImageIndex(images);
+    await writeJob(jobId, {
+      status: "done",
+      provider: settings.provider || "openrouter",
+      images: [image],
+      finishedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    await writeJob(jobId, {
+      status: "error",
+      provider: settings.provider || "openrouter",
+      error: error.message || "Generation failed",
+      finishedAt: new Date().toISOString()
+    });
+  }
+}
+
+export async function onRequest(context) {
+  const { request } = context;
   if (request.method === "OPTIONS") return new Response(null, { headers: jsonHeaders });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
 
@@ -96,24 +139,21 @@ export async function onRequest({ request }) {
     }
 
     const jobId = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `${jobId}_01.png`;
-    const key = `images/${filename}`;
-    const bytes = await generateImage({ prompt, settings });
-    await assetStore().set(key, bytes);
+    await writeJob(jobId, {
+      status: "queued",
+      provider: settings.provider || "openrouter",
+      message: "Image generation job queued.",
+      createdAt: new Date().toISOString()
+    });
 
-    const meta = metaFromBody({ jobId, prompt, body, provider: "custom" });
-    const image = {
-      name: filename,
-      url: `/api/image?name=${encodeURIComponent(filename)}`,
-      downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`,
-      modified: Date.now(),
-      size: bytes.byteLength || 0,
-      meta
-    };
-    const images = [image, ...(await readImageIndex()).filter((item) => item.name !== filename)].slice(0, 80);
-    await writeImageIndex(images);
+    const backgroundTask = runGenerationJob({ jobId, prompt, body, settings });
+    if (typeof context.waitUntil === "function") {
+      context.waitUntil(backgroundTask);
+    } else {
+      backgroundTask.catch(() => {});
+    }
 
-    return json({ ok: true, jobId, status: "done", provider: "custom", images: [image], gallery: images }, { status: 200 });
+    return json({ ok: true, jobId, status: "running", provider: settings.provider || "openrouter" }, { status: 202 });
   } catch (error) {
     return json({ ok: false, error: error.message || "Generation failed" }, { status: 500 });
   }

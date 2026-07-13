@@ -142,6 +142,21 @@ export async function writeImageIndex(images) {
   await dataStore().setJSON("images/index.json", images);
 }
 
+export async function readJob(jobId) {
+  return dataStore().get(`jobs/${jobId}.json`, {
+    type: "json",
+    consistency: "strong"
+  });
+}
+
+export async function writeJob(jobId, job) {
+  await dataStore().setJSON(`jobs/${jobId}.json`, {
+    ...job,
+    jobId,
+    updatedAt: new Date().toISOString()
+  });
+}
+
 export function metaFromBody({ jobId, prompt, body, provider }) {
   return {
     jobId,
