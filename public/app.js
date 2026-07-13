@@ -950,6 +950,15 @@ async function deleteGalleryImage(name, button) {
   }
 }
 
+async function readResponsePayload(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, error: text || `HTTP ${response.status}` };
+  }
+}
+
 async function generateOpenRouterInBrowser(pending, signal) {
   const settings = settingsPayloadForGenerate();
   const apiKey = settings.custom?.apiKey || "";
@@ -1008,7 +1017,7 @@ async function generateOpenRouterInBrowser(pending, signal) {
     }),
     signal
   });
-  const uploadData = await uploadResponse.json();
+  const uploadData = await readResponsePayload(uploadResponse);
   if (!uploadResponse.ok || !uploadData.ok) {
     throw new Error(uploadData.error || "图片保存到后台失败");
   }
