@@ -170,6 +170,41 @@ async function deleteImage(name) {
   return { ok: true, deleted: file, images: await listImages() };
 }
 
+async function saveUploadedImage(body) {
+  await fs.mkdir(jobsDir, { recursive: true });
+  await fs.mkdir(outputDir, { recursive: true });
+  const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
+  const filename = `${jobId}_01.png`;
+  let bytes;
+  if (body.imageBase64) {
+    bytes = Buffer.from(String(body.imageBase64), "base64");
+  } else if (body.imageUrl) {
+    bytes = await fetchImageBytesFromUrl(body.imageUrl);
+  } else {
+    return { ok: false, status: 400, error: "Missing imageBase64 or imageUrl" };
+  }
+  await fs.writeFile(path.join(outputDir, filename), bytes);
+  const meta = metaFromBody({
+    jobId,
+    prompt: String(body.prompt || ""),
+    body,
+    settings: { provider: body.provider || "openrouter-browser" }
+  });
+  await writeImageMeta(filename, { ...meta, source: body.provider || "openrouter-browser" });
+  const image = {
+    name: filename,
+    url: `/api/image?name=${encodeURIComponent(filename)}`,
+    downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`,
+    modified: Date.now(),
+    size: bytes.length,
+    meta
+  };
+  const gallery = await listImages();
+  const result = { ok: true, jobId, images: [image], gallery };
+  await writeResult(path.join(jobsDir, `${jobId}.result.json`), result);
+  return result;
+}
+
 async function serveFile(res, filePath, downloadName = "") {
   try {
     const stat = await fs.stat(filePath);
@@ -462,6 +497,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/images") {
       sendJson(res, 200, { images: await listImages() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/images") {
+      const raw = await readBody(req);
+      const result = await saveUploadedImage(JSON.parse(raw));
+      sendJson(res, result.status || 201, result);
       return;
     }
     if (req.method === "DELETE" && url.pathname === "/api/images") {

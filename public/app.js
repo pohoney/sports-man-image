@@ -499,6 +499,20 @@ function settingsPayloadForGenerate() {
   return normalizeSettings(mergeSettings(state.settings, localSettings));
 }
 
+function imageFromResponsePayload(payload) {
+  const first = Array.isArray(payload?.data) ? payload.data[0] : payload;
+  return {
+    b64:
+      first?.b64_json ||
+      first?.image_base64 ||
+      first?.base64 ||
+      payload?.b64_json ||
+      payload?.image_base64 ||
+      payload?.base64,
+    url: first?.url || payload?.url || payload?.image_url
+  };
+}
+
 function statePayloadForGenerate() {
   return {
     style: state.style,
@@ -936,6 +950,75 @@ async function deleteGalleryImage(name, button) {
   }
 }
 
+async function generateOpenRouterInBrowser(pending, signal) {
+  const settings = settingsPayloadForGenerate();
+  const apiKey = settings.custom?.apiKey || "";
+  if (!apiKey) {
+    throw new Error("API Key is not configured. Open Image API settings and save an API Key first.");
+  }
+  const prompt = currentPrompt();
+  pending.statusText = "正在直连 OpenRouter 生图，完成后会保存到后台图库。";
+  renderGallery();
+  const model = String(settings.custom?.model || openRouterDefaults.custom.model).trim();
+  const requestBody = {
+    model,
+    prompt,
+    n: 1,
+    size: settings.custom?.size || openRouterDefaults.custom.size
+  };
+  if (!model.startsWith("gpt-image")) {
+    requestBody.response_format = "b64_json";
+  }
+  const response = await fetch(openRouterDefaults.custom.endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+      "http-referer": window.location.origin,
+      "x-openrouter-title": "Sports Man Image"
+    },
+    body: JSON.stringify(requestBody),
+    signal
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 401) {
+      throw new Error("OpenRouter API Key 认证失败。请确认 key 以 sk-or-v1- 开头且账户可用。");
+    }
+    throw new Error(`OpenRouter 生图失败：${response.status} ${text.slice(0, 500)}`);
+  }
+  const payload = await response.json();
+  const parsed = imageFromResponsePayload(payload);
+  if (!parsed.b64 && !parsed.url) {
+    throw new Error("OpenRouter 返回中没有可保存的图片。");
+  }
+  pending.statusText = "生图完成，正在保存到后台图库。";
+  renderGallery();
+  const uploadResponse = await fetch("/api/images", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jobId: new Date().toISOString().replace(/[:.]/g, "-"),
+      provider: "openrouter-browser",
+      prompt,
+      state: statePayloadForGenerate(),
+      summary: currentSummary(),
+      imageBase64: parsed.b64,
+      imageUrl: parsed.url
+    }),
+    signal
+  });
+  const uploadData = await uploadResponse.json();
+  if (!uploadResponse.ok || !uploadData.ok) {
+    throw new Error(uploadData.error || "图片保存到后台失败");
+  }
+  state.galleryImages = uploadData.gallery || uploadData.images || [];
+  completePendingGeneration(pending.id);
+  renderGalleryFilters();
+  renderGallery();
+  $("#statusText").textContent = "生成完成，已保存到后台图库。";
+}
+
 function showHome() {
   $("#homeView").hidden = false;
   $("#galleryView").hidden = true;
@@ -951,13 +1034,18 @@ async function generate() {
   const button = $("#generateButton");
   button.disabled = true;
   const pending = createPendingGeneration();
-  $("#statusText").textContent = state.settings.provider === "codex" ? "已提交生成任务，正在启动 Codex。" : "已提交生成任务，正在调用生图 API。";
+  const settings = settingsPayloadForGenerate();
+  $("#statusText").textContent = settings.provider === "openrouter" ? "正在直连 OpenRouter 生图。" : "已提交生成任务，正在调用生图 API。";
   $("#homeView").hidden = true;
   $("#galleryView").hidden = false;
   upsertPendingGeneration(pending);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 150000);
+  const timeout = setTimeout(() => controller.abort(), 600000);
   try {
+    if (settings.provider === "openrouter") {
+      await generateOpenRouterInBrowser(pending, controller.signal);
+      return;
+    }
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -985,7 +1073,7 @@ async function generate() {
   } catch (error) {
     const message =
       error.name === "AbortError"
-        ? "生图等待超时。GPT Image 复杂 prompt 可能接近 2 分钟，请稍后重试，或先降低尺寸后再生成。"
+        ? "生图等待超时。复杂 prompt 可能需要更久，请稍后重试，或先降低尺寸后再生成。"
         : error.message;
     failPendingGeneration(pending.id, message);
     $("#statusText").textContent = `生成失败：${message}`;
