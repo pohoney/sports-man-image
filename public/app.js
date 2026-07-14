@@ -970,8 +970,13 @@ async function deleteGalleryImage(name, button) {
   $("#statusText").textContent = `正在删除：${name}`;
   try {
     const response = await fetch(`/api/images?name=${encodeURIComponent(name)}`, { method: "DELETE" });
-    const data = await response.json();
+    const data = await readResponsePayload(response);
     if (!response.ok || !data.ok) {
+      await loadGallery();
+      if (!state.galleryImages.some((image) => image.name === name)) {
+        $("#statusText").textContent = `已从后台删除：${name}`;
+        return;
+      }
       throw new Error(data.error || "删除失败");
     }
     state.galleryImages = data.images || state.galleryImages.filter((image) => image.name !== name);
@@ -982,6 +987,17 @@ async function deleteGalleryImage(name, button) {
     button.disabled = false;
     $("#statusText").textContent = `删除失败：${error.message}`;
   }
+}
+
+async function findSavedGeneration(jobId) {
+  const response = await fetch("/api/images");
+  if (!response.ok) return null;
+  const data = await response.json();
+  const images = data.images || [];
+  const saved = images.find((image) => image.meta?.jobId === jobId);
+  if (!saved) return null;
+  state.galleryImages = images;
+  return saved;
 }
 
 async function readResponsePayload(response) {
@@ -1037,11 +1053,12 @@ async function generateOpenRouterInBrowser(pending, signal) {
   }
   pending.statusText = "生图完成，正在保存到后台图库。";
   renderGallery();
+  const jobId = new Date().toISOString().replace(/[:.]/g, "-");
   const uploadResponse = await fetch("/api/images", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      jobId: new Date().toISOString().replace(/[:.]/g, "-"),
+      jobId,
       provider: "openrouter-browser",
       prompt,
       state: statePayloadForGenerate(),
@@ -1054,6 +1071,14 @@ async function generateOpenRouterInBrowser(pending, signal) {
   });
   const uploadData = await readResponsePayload(uploadResponse);
   if (!uploadResponse.ok || !uploadData.ok) {
+    const saved = await findSavedGeneration(jobId);
+    if (saved) {
+      completePendingGeneration(pending.id);
+      renderGalleryFilters();
+      renderGallery();
+      $("#statusText").textContent = "生成完成，已保存到后台图库。";
+      return;
+    }
     throw new Error(uploadData.error || "图片保存到后台失败");
   }
   state.galleryImages = uploadData.gallery || uploadData.images || [];
