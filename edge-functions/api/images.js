@@ -90,13 +90,31 @@ export async function onRequest({ request }) {
     return json({ ok: false, error: "Invalid image name" }, { status: 400 });
   }
 
-  const images = await readImageIndex();
-  const target = images.find((image) => image.name === name);
-  const nextImages = images.filter((image) => image.name !== name);
-  await assetStore().delete(`images/${name}`);
-  if (target?.meta?.jobId) {
-    await dataStore().delete(`jobs/${target.meta.jobId}.json`);
+  try {
+    const images = await readImageIndex();
+    const target = images.find((image) => image.name === name);
+    const nextImages = images.filter((image) => image.name !== name);
+    await writeImageIndex(nextImages);
+
+    const errors = [];
+    try {
+      await assetStore().delete(`images/${name}`);
+    } catch (error) {
+      errors.push(`image blob: ${error.message || error}`);
+    }
+    if (target?.meta?.jobId) {
+      try {
+        await dataStore().delete(`jobs/${target.meta.jobId}.json`);
+      } catch (error) {
+        errors.push(`job meta: ${error.message || error}`);
+      }
+    }
+
+    if (errors.length) {
+      return json({ ok: false, deleted: name, images: nextImages, error: errors.join("; ") }, { status: 207 });
+    }
+    return json({ ok: true, deleted: name, images: nextImages });
+  } catch (error) {
+    return json({ ok: false, error: error.message || "Image delete failed" }, { status: 500 });
   }
-  await writeImageIndex(nextImages);
-  return json({ ok: true, deleted: name, images: nextImages });
 }
