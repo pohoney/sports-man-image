@@ -508,7 +508,13 @@ function imageFromResponsePayload(payload) {
     payload?.b64_json ||
     payload?.image_base64 ||
     payload?.base64;
-  const mime = String(b64 || "").match(/^data:([^;]+);base64,/)?.[1] || first?.mime_type || payload?.mime_type || "";
+  const mime =
+    String(b64 || "").match(/^data:([^;]+);base64,/)?.[1] ||
+    first?.media_type ||
+    first?.mime_type ||
+    payload?.media_type ||
+    payload?.mime_type ||
+    "";
   return {
     b64,
     url: first?.url || payload?.url || payload?.image_url,
@@ -1023,11 +1029,9 @@ async function generateOpenRouterInBrowser(pending, signal) {
     model,
     prompt,
     n: 1,
-    size: settings.custom?.size || openRouterDefaults.custom.size
+    size: settings.custom?.size || openRouterDefaults.custom.size,
+    output_format: "png"
   };
-  if (!model.startsWith("gpt-image")) {
-    requestBody.response_format = "b64_json";
-  }
   const response = await fetch(openRouterDefaults.custom.endpoint, {
     method: "POST",
     headers: {
