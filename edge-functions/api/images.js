@@ -28,7 +28,10 @@ function bytesFromBase64(value) {
   return new Uint8Array(output);
 }
 
-function extensionFromMime(mime) {
+function extensionFromBytes(bytes, mime) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "webp";
   const clean = String(mime || "").toLowerCase();
   if (clean.includes("jpeg") || clean.includes("jpg")) return "jpg";
   if (clean.includes("webp")) return "webp";
@@ -42,7 +45,6 @@ export async function onRequest({ request }) {
     try {
       const body = await request.json();
       const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
-      const filename = `${jobId}_01.${extensionFromMime(body.imageMime)}`;
       let bytes;
       if (body.imageBase64) {
         bytes = bytesFromBase64(body.imageBase64);
@@ -51,6 +53,10 @@ export async function onRequest({ request }) {
       } else {
         return json({ ok: false, error: "Missing imageBase64 or imageUrl" }, { status: 400 });
       }
+      if ((bytes.byteLength || 0) < 1024) {
+        return json({ ok: false, error: "Image payload is too small to be a generated result" }, { status: 422 });
+      }
+      const filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
 
       await assetStore().set(`images/${filename}`, bytes);
       const meta = metaFromBody({

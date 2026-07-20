@@ -532,6 +532,14 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+function base64ByteLength(value) {
+  const clean = String(value || "")
+    .replace(/^data:[^,]+,/, "")
+    .replace(/\s/g, "")
+    .replace(/=+$/, "");
+  return Math.floor((clean.length * 3) / 4);
+}
+
 async function imageFromGenerationResponse(response) {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.startsWith("image/")) {
@@ -1054,6 +1062,9 @@ async function generateOpenRouterInBrowser(pending, signal) {
   const parsed = await imageFromGenerationResponse(response);
   if (!parsed.b64 && !parsed.url) {
     throw new Error("OpenRouter 返回中没有可保存的图片。");
+  }
+  if (parsed.b64 && base64ByteLength(parsed.b64) < 1024) {
+    throw new Error("OpenRouter 返回的图片数据异常小，已阻止保存为空白图。请重试或更换模型。");
   }
   pending.statusText = "生图完成，正在保存到后台图库。";
   renderGallery();

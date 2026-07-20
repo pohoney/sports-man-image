@@ -170,7 +170,10 @@ async function deleteImage(name) {
   return { ok: true, deleted: file, images: await listImages() };
 }
 
-function extensionFromMime(mime) {
+function extensionFromBytes(bytes, mime) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "jpg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "png";
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "webp";
   const clean = String(mime || "").toLowerCase();
   if (clean.includes("jpeg") || clean.includes("jpg")) return "jpg";
   if (clean.includes("webp")) return "webp";
@@ -185,7 +188,6 @@ async function saveUploadedImage(body) {
   await fs.mkdir(jobsDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
   const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
-  const filename = `${jobId}_01.${extensionFromMime(body.imageMime)}`;
   let bytes;
   if (body.imageBase64) {
     bytes = Buffer.from(base64Payload(body.imageBase64), "base64");
@@ -194,6 +196,10 @@ async function saveUploadedImage(body) {
   } else {
     return { ok: false, status: 400, error: "Missing imageBase64 or imageUrl" };
   }
+  if ((bytes.byteLength || 0) < 1024) {
+    return { ok: false, status: 422, error: "Image payload is too small to be a generated result" };
+  }
+  const filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
   await fs.writeFile(path.join(outputDir, filename), bytes);
   const meta = metaFromBody({
     jobId,
