@@ -46,19 +46,30 @@ export async function onRequest({ request }) {
       const body = await request.json();
       const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
       let bytes;
-      if (body.imageBase64) {
+      let filename = String(body.imageName || "").replace(/[^a-zA-Z0-9._-]/g, "");
+      let imageSize = Number(body.imageSize || 0);
+      if (filename) {
+        if (!/\.(png|jpe?g|webp)$/i.test(filename)) {
+          return json({ ok: false, error: "Invalid image name" }, { status: 400 });
+        }
+        if (!Number.isFinite(imageSize) || imageSize < 1024) {
+          return json({ ok: false, error: "Image payload is too small to be a generated result" }, { status: 422 });
+        }
+      } else if (body.imageBase64) {
         bytes = bytesFromBase64(body.imageBase64);
       } else if (body.imageUrl) {
         bytes = await fetchImageBytesFromUrl(body.imageUrl);
       } else {
-        return json({ ok: false, error: "Missing imageBase64 or imageUrl" }, { status: 400 });
+        return json({ ok: false, error: "Missing imageName, imageBase64 or imageUrl" }, { status: 400 });
       }
-      if ((bytes.byteLength || 0) < 1024) {
+      if (bytes && (bytes.byteLength || 0) < 1024) {
         return json({ ok: false, error: "Image payload is too small to be a generated result" }, { status: 422 });
       }
-      const filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
-
-      await assetStore().set(`images/${filename}`, bytes);
+      if (!filename) {
+        filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
+        imageSize = bytes.byteLength || 0;
+        await assetStore().set(`images/${filename}`, bytes);
+      }
       const meta = metaFromBody({
         jobId,
         prompt: String(body.prompt || ""),
@@ -70,7 +81,7 @@ export async function onRequest({ request }) {
         url: `/api/image?name=${encodeURIComponent(filename)}`,
         downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`,
         modified: Date.now(),
-        size: bytes.byteLength || 0,
+        size: imageSize,
         meta
       };
       const images = [image, ...(await readImageIndex()).filter((item) => item.name !== filename)].slice(0, 80);

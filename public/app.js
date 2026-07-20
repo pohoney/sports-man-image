@@ -540,6 +540,16 @@ function base64ByteLength(value) {
   return Math.floor((clean.length * 3) / 4);
 }
 
+function base64ToBlob(value, mime = "image/png") {
+  const clean = String(value || "").replace(/^data:[^,]+,/, "").replace(/\s/g, "");
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime || "image/png" });
+}
+
 async function imageFromGenerationResponse(response) {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.startsWith("image/")) {
@@ -1066,9 +1076,39 @@ async function generateOpenRouterInBrowser(pending, signal) {
   if (parsed.b64 && base64ByteLength(parsed.b64) < 1024) {
     throw new Error("OpenRouter 返回的图片数据异常小，已阻止保存为空白图。请重试或更换模型。");
   }
-  pending.statusText = "生图完成，正在保存到后台图库。";
+  pending.statusText = "生图完成，正在上传到后台图库。";
   renderGallery();
   const jobId = new Date().toISOString().replace(/[:.]/g, "-");
+  let imageName = "";
+  let imageSize = 0;
+  let imageMime = parsed.mime || "image/png";
+
+  if (parsed.b64) {
+    const blob = base64ToBlob(parsed.b64, imageMime);
+    imageSize = blob.size;
+    imageMime = blob.type || imageMime;
+    const uploadUrlResponse = await fetch("/api/upload-url", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jobId, imageMime, imageSize }),
+      signal
+    });
+    const uploadUrlData = await readResponsePayload(uploadUrlResponse);
+    if (!uploadUrlResponse.ok || !uploadUrlData.ok || !uploadUrlData.uploadUrl) {
+      throw new Error(uploadUrlData.error || "创建图片上传地址失败");
+    }
+    const directUploadResponse = await fetch(uploadUrlData.uploadUrl, {
+      method: "PUT",
+      headers: { "content-type": imageMime },
+      body: blob,
+      signal
+    });
+    if (!directUploadResponse.ok) {
+      throw new Error(`图片直传后台失败：${directUploadResponse.status}`);
+    }
+    imageName = uploadUrlData.name;
+  }
+
   const uploadResponse = await fetch("/api/images", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -1078,9 +1118,11 @@ async function generateOpenRouterInBrowser(pending, signal) {
       prompt,
       state: statePayloadForGenerate(),
       summary: currentSummary(),
-      imageBase64: parsed.b64,
+      imageName,
+      imageSize,
+      imageBase64: parsed.b64 && !imageName ? parsed.b64 : "",
       imageUrl: parsed.url,
-      imageMime: parsed.mime
+      imageMime
     }),
     signal
   });

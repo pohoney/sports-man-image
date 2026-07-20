@@ -180,8 +180,58 @@ function extensionFromBytes(bytes, mime) {
   return "png";
 }
 
+function extensionFromMime(mime) {
+  const clean = String(mime || "").toLowerCase();
+  if (clean.includes("jpeg") || clean.includes("jpg")) return "jpg";
+  if (clean.includes("webp")) return "webp";
+  return "png";
+}
+
 function base64Payload(value) {
   return String(value || "").replace(/^data:[^,]+,/, "").replace(/\s/g, "");
+}
+
+async function readBinaryBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+function safeImageName(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9._-]/g, "");
+}
+
+async function createLocalUploadUrl(body) {
+  await fs.mkdir(outputDir, { recursive: true });
+  const jobId = safeImageName(body.jobId || new Date().toISOString().replace(/[:.]/g, "-"));
+  const imageSize = Number(body.imageSize || 0);
+  if (!jobId) return { ok: false, status: 400, error: "Missing jobId" };
+  if (!Number.isFinite(imageSize) || imageSize < 1024) {
+    return { ok: false, status: 422, error: "Image payload is too small to be a generated result" };
+  }
+  const imageMime = String(body.imageMime || "image/png").split(";")[0] || "image/png";
+  const filename = `${jobId}_01.${extensionFromMime(imageMime)}`;
+  return {
+    ok: true,
+    jobId,
+    name: filename,
+    uploadUrl: `/api/upload?name=${encodeURIComponent(filename)}`,
+    url: `/api/image?name=${encodeURIComponent(filename)}`,
+    downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`
+  };
+}
+
+async function saveDirectUpload(name, bytes) {
+  await fs.mkdir(outputDir, { recursive: true });
+  const filename = safeImageName(path.basename(name || ""));
+  if (!filename || !/\.(png|jpe?g|webp)$/i.test(filename)) {
+    return { ok: false, status: 400, error: "Invalid image name" };
+  }
+  if ((bytes.byteLength || 0) < 1024) {
+    return { ok: false, status: 422, error: "Image payload is too small to be a generated result" };
+  }
+  await fs.writeFile(path.join(outputDir, filename), bytes);
+  return { ok: true, name: filename, size: bytes.byteLength || 0 };
 }
 
 async function saveUploadedImage(body) {
@@ -189,18 +239,39 @@ async function saveUploadedImage(body) {
   await fs.mkdir(outputDir, { recursive: true });
   const jobId = String(body.jobId || new Date().toISOString().replace(/[:.]/g, "-")).replace(/[^a-zA-Z0-9._-]/g, "");
   let bytes;
-  if (body.imageBase64) {
+  let filename = safeImageName(body.imageName || "");
+  let imageSize = Number(body.imageSize || 0);
+  if (filename) {
+    if (!/\.(png|jpe?g|webp)$/i.test(filename)) {
+      return { ok: false, status: 400, error: "Invalid image name" };
+    }
+    if (!Number.isFinite(imageSize) || imageSize < 1024) {
+      return { ok: false, status: 422, error: "Image payload is too small to be a generated result" };
+    }
+    try {
+      const stat = await fs.stat(path.join(outputDir, filename));
+      if (!stat.isFile() || stat.size < 1024) {
+        return { ok: false, status: 422, error: "Uploaded image file is missing or too small" };
+      }
+      imageSize = stat.size;
+    } catch {
+      return { ok: false, status: 404, error: "Uploaded image file was not found" };
+    }
+  } else if (body.imageBase64) {
     bytes = Buffer.from(base64Payload(body.imageBase64), "base64");
   } else if (body.imageUrl) {
     bytes = await fetchImageBytesFromUrl(body.imageUrl);
   } else {
-    return { ok: false, status: 400, error: "Missing imageBase64 or imageUrl" };
+    return { ok: false, status: 400, error: "Missing imageName, imageBase64 or imageUrl" };
   }
-  if ((bytes.byteLength || 0) < 1024) {
+  if (bytes && (bytes.byteLength || 0) < 1024) {
     return { ok: false, status: 422, error: "Image payload is too small to be a generated result" };
   }
-  const filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
-  await fs.writeFile(path.join(outputDir, filename), bytes);
+  if (!filename) {
+    filename = `${jobId}_01.${extensionFromBytes(bytes, body.imageMime)}`;
+    imageSize = bytes.length;
+    await fs.writeFile(path.join(outputDir, filename), bytes);
+  }
   const meta = metaFromBody({
     jobId,
     prompt: String(body.prompt || ""),
@@ -213,7 +284,7 @@ async function saveUploadedImage(body) {
     url: `/api/image?name=${encodeURIComponent(filename)}`,
     downloadUrl: `/api/download?name=${encodeURIComponent(filename)}`,
     modified: Date.now(),
-    size: bytes.length,
+    size: imageSize,
     meta
   };
   const gallery = await listImages();
@@ -514,6 +585,18 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/images") {
       sendJson(res, 200, { images: await listImages() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/upload-url") {
+      const raw = await readBody(req);
+      const result = await createLocalUploadUrl(JSON.parse(raw));
+      sendJson(res, result.status || 200, result);
+      return;
+    }
+    if (req.method === "PUT" && url.pathname === "/api/upload") {
+      const bytes = await readBinaryBody(req);
+      const result = await saveDirectUpload(url.searchParams.get("name"), bytes);
+      sendJson(res, result.status || 200, result);
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/images") {
