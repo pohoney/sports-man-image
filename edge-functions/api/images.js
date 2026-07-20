@@ -86,14 +86,6 @@ export async function onRequest({ request }) {
       };
       const images = [image, ...(await readImageIndex()).filter((item) => item.name !== filename)].slice(0, 80);
       await writeImageIndex(images);
-      await dataStore().setJSON(`jobs/${jobId}.json`, {
-        status: "done",
-        provider: body.provider || "openrouter-browser",
-        images: [image],
-        finishedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        jobId
-      });
       return json({ ok: true, jobId, images: [image], gallery: images }, { status: 201 });
     } catch (error) {
       return json({ ok: false, error: error.message || "Image upload failed" }, { status: 500 });
